@@ -1,0 +1,52 @@
+robot:
+  robot_specifications:
+    - initial_pose:
+        x: 0
+        y: 0
+        theta: 0
+    - footprint:
+        footprint_specifications:
+          radius: 0.3
+          points:
+            - point:
+                x: -0.2
+                y: -0.2
+            - point:
+                x: 0.2
+                y: -0.2
+            - point:
+                x: 0.2
+                y: 0.2
+            - point:
+                x: -0.2
+                y: 0.2
+    - laser:
+        laser_specifications:
+          max_angle: 1.57079
+          min_angle: -1.57079
+          max_range: 4
+          min_range: 0.1
+          num_rays: 270
+          frequency: 10
+          frame_id: laser_0
+          pose:
+            x: 0
+            y: 0
+            theta: 0
+          noise:
+            noise_specifications:
+              noise_mean: 0.5
+              noise_std: 0.05
+    - rfid_reader:
+        rfid_reader_specifications:
+          max_range: 3
+          angle_span: 6.28319
+          signal_cutoff: 0
+          frequency: 10
+          frame_id: rfid_reader_0
+          pose:
+            x: 0
+            y: 0
+            theta: 0
+    - kinematic:
+        filename: kinematic_models/ideal_kinematic.yaml

@@ -1,0 +1,46 @@
+robot:
+  robot_specifications:
+    - initial_pose:
+        x: 0
+        y: 0
+        theta: 0
+    - footprint:
+        footprint_specifications:
+          points:
+            - point:
+                x: 0
+                y: 0.066675
+            - point:
+                x: -0.136525
+                y: 0.066675
+            - point:
+                x: -0.1836713
+                y: 0.04714634
+            - point:
+                x: -0.2032
+                y: 0.0
+            - point:
+                x: -0.1836713
+                y: -0.04714634
+            - point:
+                x: -0.136525
+                y: -0.066675
+            - point:
+                x: 0
+                y: -0.066675
+    - sonar:
+        filename: range_sensors/VL53L0X.yaml
+        sonar_specifications:
+          pose:
+            x: -0.0254
+            y: 0
+            theta: 0
+    - sonar:
+        filename: range_sensors/VL53L0X.yaml
+        sonar_specifications:
+          pose:
+            x: -0.03283949
+            y: -0.01796051
+            theta: -0.785398
+    - kinematic:
+        filename: kinematic_models/ideal_kinematic.yaml

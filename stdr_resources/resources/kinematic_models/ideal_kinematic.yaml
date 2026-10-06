@@ -1,0 +1,3 @@
+kinematic:
+  kinematic_specifications:
+    kinematic_model: ideal

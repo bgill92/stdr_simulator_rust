@@ -1,0 +1,4 @@
+kinematic:
+  kinematic_specifications:
+    kinematic_model: ideal
+    odometry_model: velocity

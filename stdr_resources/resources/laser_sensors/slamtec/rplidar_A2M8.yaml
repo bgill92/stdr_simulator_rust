@@ -1,0 +1,19 @@
+# SLAMTEC RPLIDAR A2M8 datasheet: 0.15-12 m range, 10 Hz scan rate, 360 deg FOV.
+# noise_std is a flat approximation of the datasheet's ~1% of range distance
+# accuracy over the sensor's typical indoor working range.
+laser:
+  laser_specifications:
+    max_angle: 3.14159265359
+    min_angle: -3.14159265359
+    max_range: 12.0
+    min_range: 0.15
+    num_rays: 360
+    frequency: 10
+    pose:
+      x: 0
+      y: 0
+      theta: 0
+    noise:
+      noise_specifications:
+        noise_mean: 0.0
+        noise_std: 0.02

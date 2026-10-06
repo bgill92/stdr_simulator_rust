@@ -1,0 +1,25 @@
+robot:
+  robot_specifications:
+    - initial_pose:
+        x: 0
+        y: 0
+        theta: 0
+    - footprint:
+        footprint_specifications:
+          points:
+            - point:
+                x: -0.2
+                y: -0.2
+            - point:
+                x: 0.2
+                y: -0.2
+            - point:
+                x: 0.2
+                y: 0.2
+            - point:
+                x: -0.2
+                y: 0.2
+    - laser:
+        filename: laser_sensors/hokuyo/hokuyo_URG_04LX.yaml
+    - kinematic:
+        filename: kinematic_models/ideal_kinematic.yaml

@@ -1,0 +1,29 @@
+# Rate-invariant noise scaling means alpha * u^2 * T is the error variance
+# accumulated over T seconds, so each alpha has units of (error unit)^2 per
+# (command unit)^2 per second. Per-tick velocity noise std is
+# sqrt(alpha / dt) * |u|.
+#
+# These values give roughly 2 cm translational error std after 1 s at 1 m/s
+# (a_ux_ux) and roughly 1 degree heading error std after 1 s at 1 rad/s
+# (a_w_w), typical of a decent differential-drive base on flat floor.
+#
+# Compare with ideal_kinematic_noisy.yaml (a_w_w = 0.02, about 8 degrees per
+# second), which is deliberately exaggerated for demonstration and makes the
+# ground-truth pose visibly jitter at a 100 Hz physics tick.
+kinematic:
+  kinematic_specifications:
+    kinematic_model: ideal
+    odometry_model: velocity
+    kinematic_parameters:
+      a_ux_ux: 0.01
+      a_ux_uy: 0.0
+      a_ux_w: 0.001
+      a_uy_ux: 0.0
+      a_uy_uy: 0.0
+      a_uy_w: 0.0
+      a_w_ux: 0.0
+      a_w_uy: 0.0
+      a_w_w: 0.0075
+      a_g_ux: 0.0001
+      a_g_uy: 0.0
+      a_g_w: 0.005

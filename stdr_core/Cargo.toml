@@ -1,0 +1,13 @@
+[package]
+name = "stdr_core"
+version = "0.1.0"
+edition.workspace = true
+
+[dependencies]
+image = { version = "0.25.10", default-features = false, features = ["png", "pnm"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_yaml_ng = "0.10.0"
+thiserror = "2.0.21"
+
+[dev-dependencies]
+approx = "0.5.1"

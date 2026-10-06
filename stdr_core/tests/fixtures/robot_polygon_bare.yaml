@@ -1,0 +1,30 @@
+robot:
+  robot_specifications:
+    - initial_pose:
+        x: 0
+        y: 0
+        theta: 0
+    - footprint:
+        footprint_specifications:
+          points:
+            - x: 0.3
+              y: 0.4
+            - x: -0.3
+              y: 0.4
+            - x: -0.3
+              y: -0.4
+    - kinematic:
+        kinematic_specifications:
+          type: ideal
+          a_ux_ux: 0
+          a_ux_uy: 0
+          a_ux_w: 0
+          a_uy_ux: 0
+          a_uy_uy: 0
+          a_uy_w: 0
+          a_w_ux: 0
+          a_w_uy: 0
+          a_w_w: 0
+          a_g_ux: 0
+          a_g_uy: 0
+          a_g_w: 0

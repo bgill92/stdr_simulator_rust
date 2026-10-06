@@ -1,0 +1,3 @@
+image: tiny.pgm
+resolution: 0.05
+negate: 1

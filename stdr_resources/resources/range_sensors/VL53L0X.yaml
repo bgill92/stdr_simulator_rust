@@ -1,0 +1,12 @@
+sonar:
+  sonar_specifications:
+    cone_angle: 0.436332
+    max_range: 2.0
+    min_range: 0.05
+    frequency: 10
+    pose:
+      x: 0
+      y: 0
+      theta: 0
+    noise:
+      filename: noises/noise_gauss_VL53L0.yaml

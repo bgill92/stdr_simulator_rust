@@ -1,0 +1,6 @@
+robot:
+  robot_specifications:
+    - laser:
+        laser_specifications:
+          noise:
+            filename: noises/include_loop.yaml

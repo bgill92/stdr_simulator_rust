@@ -1,0 +1,4 @@
+robot:
+  robot_specifications:
+    - laser:
+        filename: nonexistent_laser.yaml
