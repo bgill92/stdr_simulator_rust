@@ -1,0 +1,9 @@
+robot:
+  robot_specifications:
+    - footprint:
+        footprint_specifications:
+          radius: 0.3
+    # Unknown keys are skipped silently, as in C++.
+    - gripper:
+        gripper_specifications:
+          reach: 0.5

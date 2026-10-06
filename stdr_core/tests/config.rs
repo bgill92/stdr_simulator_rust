@@ -318,6 +318,12 @@ mod config {
     }
 
     #[test]
+    fn unknown_entry_ignored_without_warning() {
+        let cfg = load("robot_unknown_entry.yaml");
+        assert!(cfg.sensors.is_empty());
+    }
+
+    #[test]
     fn unknown_kinematic_rejected_at_load() {
         let err = load_err("robot_kinematic_invalid.yaml");
         assert!(

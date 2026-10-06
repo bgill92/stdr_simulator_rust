@@ -258,11 +258,6 @@ pub fn load_robot_config(
                         "{}: '{key}' sensors are not simulated yet; skipped",
                         path.display()
                     ));
-                } else {
-                    warnings.push(format!(
-                        "{}: unknown robot_specifications entry '{key}' ignored",
-                        path.display()
-                    ));
                 }
             }
         }
