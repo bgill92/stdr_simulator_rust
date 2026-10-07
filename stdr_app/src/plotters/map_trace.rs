@@ -9,10 +9,11 @@ use crate::overlay::{self, Canvas, Style};
 use crate::plot::overlay_plot::{PlotCanvas, draw_map, map_plot};
 use crate::plot::{
     LockView, MARKER_SPACING, MAX_MARKERS, PlotterCtl, Positioned, TeleportDetector, Trail,
-    add_plotter, plotter_window,
+    add_plotter, plotter_tab,
 };
 use crate::register_plotter;
 use crate::sim::{Selection, SimWorld};
+use crate::ui::dock::Dock;
 use crate::view2d::MapTexture;
 
 const NAME: &str = "Map Trace";
@@ -85,6 +86,7 @@ fn age_bins(xy: &[[f64; 2]]) -> Vec<([u8; 4], Vec<[f64; 2]>)> {
 
 fn render(
     mut ctx: EguiContexts,
+    dock: Res<Dock>,
     sim: Res<SimWorld>,
     tex: Res<MapTexture>,
     st: Res<MapTrace>,
@@ -92,7 +94,7 @@ fn render(
     mut lock: Local<LockView>,
 ) -> Result {
     let robot = st.robot.and_then(|id| sim.robot(id));
-    plotter_window(ctx.ctx_mut()?, &mut ctl, |ui| {
+    plotter_tab(ctx.ctx_mut()?, &dock, &mut ctl, |ui| {
         map_plot("map_trace", lock.0).show(ui, |p| {
             draw_map(p, &tex);
             let mut c = PlotCanvas(p);

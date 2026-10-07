@@ -6,9 +6,10 @@ use egui_plot::{Legend, Plot};
 use stdr_core::{RobotId, Twist2D};
 
 use crate::overlay;
-use crate::plot::{PlotterCtl, PlotterSample, SampleGate, TimeSeries, add_plotter, plotter_window};
+use crate::plot::{PlotterCtl, PlotterSample, SampleGate, TimeSeries, add_plotter, plotter_tab};
 use crate::register_plotter;
 use crate::sim::{Selection, SimCommand, SimWorld};
+use crate::ui::dock::Dock;
 
 const NAME: &str = "Pose Error";
 const DRIVE: Twist2D = Twist2D {
@@ -91,10 +92,11 @@ fn stop_when_inactive(
 
 fn render(
     mut ctx: EguiContexts,
+    dock: Res<Dock>,
     st: Res<PoseError>,
     mut ctl: ResMut<PlotterCtl<PoseError>>,
 ) -> Result {
-    plotter_window(ctx.ctx_mut()?, &mut ctl, |ui| {
+    plotter_tab(ctx.ctx_mut()?, &dock, &mut ctl, |ui| {
         if st.robot.is_none() {
             ui.label("Select a robot to drive.");
         }

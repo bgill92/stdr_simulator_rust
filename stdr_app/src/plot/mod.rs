@@ -7,7 +7,7 @@
 
 pub mod overlay_plot;
 
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 use std::marker::PhantomData;
 
 use bevy::ecs::component::Mutable;
@@ -17,6 +17,8 @@ use bevy_egui::{EguiPrimaryContextPass, egui};
 use stdr_core::{Point2D, Pose2D};
 
 use crate::sim::{SimEvent, apply_sim_commands};
+use crate::ui::dock::{Dock, show_pane};
+use crate::ui::toolbar::toolbar;
 
 /// Pause keeps the state but skips sampling; a removed plotter neither samples nor renders until
 /// it is shown again, and then starts from `P::default()`.
@@ -25,18 +27,15 @@ pub struct PlotterCtl<P> {
     pub name: &'static str,
     pub paused: bool,
     pub removed: bool,
-    /// Build order, for cascading the windows' first positions.
-    slot: usize,
     _p: PhantomData<fn() -> P>,
 }
 
 impl<P> PlotterCtl<P> {
-    pub fn new(name: &'static str, slot: usize) -> Self {
+    pub fn new(name: &'static str) -> Self {
         Self {
             name,
             paused: false,
             removed: false,
-            slot,
             _p: PhantomData,
         }
     }
@@ -46,25 +45,18 @@ pub fn plotter_active<P: Send + Sync + 'static>(c: Res<PlotterCtl<P>>) -> bool {
     !c.paused && !c.removed
 }
 
-/// The plotter's window: a Pause checkbox above `body`; closing the window removes the plotter.
-pub fn plotter_window<P>(
+/// The plotter's Plots tab, drawn only while selected: a Pause checkbox above `body`. Closing the
+/// tab ([`ClosePlotter`]) removes the plotter.
+pub fn plotter_tab<P>(
     ctx: &egui::Context,
+    dock: &Dock,
     ctl: &mut PlotterCtl<P>,
     body: impl FnOnce(&mut egui::Ui),
 ) {
-    let mut open = true;
-    egui::Window::new(ctl.name)
-        .open(&mut open)
-        .default_pos([
-            360.0 + 40.0 * ctl.slot as f32,
-            60.0 + 40.0 * ctl.slot as f32,
-        ])
-        .default_width(420.0)
-        .show(ctx, |ui| {
-            ui.checkbox(&mut ctl.paused, "Pause");
-            body(ui);
-        });
-    ctl.removed = !open;
+    show_pane(ctx, ctl.name, dock.tab_body(ctl.name), |ui| {
+        ui.checkbox(&mut ctl.paused, "Pause");
+        body(ui);
+    });
 }
 
 /// The "Lock view to map" checkbox. A UI preference, so it lives in a render system's `Local`
@@ -86,9 +78,17 @@ pub struct PlotterNames(pub Vec<&'static str>);
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PlotterSample;
 
-/// Re-open the named plotter after its window was closed.
+/// Re-open the named plotter after its tab was closed.
 #[derive(Message, Clone, Debug, PartialEq)]
 pub struct ShowPlotter(pub &'static str);
+
+/// Close the named plotter (its Plots tab's close button).
+#[derive(Message, Clone, Debug, PartialEq)]
+pub struct ClosePlotter(pub &'static str);
+
+/// Names of the plotters not removed: the Plots tabs.
+#[derive(Resource, Default)]
+pub struct OpenPlotters(pub HashSet<&'static str>);
 
 /// Wires one plotter into the app.
 pub fn add_plotter<P: Resource<Mutability = Mutable> + Default, M1, M2>(
@@ -97,22 +97,29 @@ pub fn add_plotter<P: Resource<Mutability = Mutable> + Default, M1, M2>(
     sample: impl IntoScheduleConfigs<ScheduleSystem, M1>,
     render: impl IntoScheduleConfigs<ScheduleSystem, M2>,
 ) {
-    app.init_resource::<PlotterNames>();
-    let slot = app.world().resource::<PlotterNames>().0.len();
-    app.init_resource::<P>()
-        .insert_resource(PlotterCtl::<P>::new(name, slot))
+    app.init_resource::<PlotterNames>()
+        .init_resource::<OpenPlotters>()
+        .init_resource::<P>()
+        .insert_resource(PlotterCtl::<P>::new(name))
         .add_message::<ShowPlotter>()
+        .add_message::<ClosePlotter>()
         .add_systems(
             Update,
             sample.run_if(plotter_active::<P>).in_set(PlotterSample),
         )
         .add_systems(
             EguiPrimaryContextPass,
-            render.run_if(|c: Res<PlotterCtl<P>>| !c.removed),
+            render
+                .run_if(|c: Res<PlotterCtl<P>>| !c.removed)
+                .after(toolbar),
         )
         .add_systems(
             PreUpdate,
-            (reset_on_event::<P>, show_on_request::<P>).after(apply_sim_commands),
+            (
+                reset_on_event::<P>,
+                (open_close_on_request::<P>, track_open::<P>).chain(),
+            )
+                .after(apply_sim_commands),
         );
     app.world_mut().resource_mut::<PlotterNames>().0.push(name);
 }
@@ -126,14 +133,26 @@ fn reset_on_event<P: Resource<Mutability = Mutable> + Default>(
     }
 }
 
-fn show_on_request<P: Resource<Mutability = Mutable> + Default>(
-    mut requests: MessageReader<ShowPlotter>,
+fn open_close_on_request<P: Resource<Mutability = Mutable> + Default>(
+    mut show: MessageReader<ShowPlotter>,
+    mut close: MessageReader<ClosePlotter>,
     mut ctl: ResMut<PlotterCtl<P>>,
     mut p: ResMut<P>,
 ) {
-    if requests.read().any(|r| r.0 == ctl.name) && ctl.removed {
+    if close.read().any(|r| r.0 == ctl.name) {
+        ctl.removed = true;
+    }
+    if show.read().any(|r| r.0 == ctl.name) && ctl.removed {
         ctl.removed = false;
         *p = P::default();
+    }
+}
+
+fn track_open<P: Send + Sync + 'static>(ctl: Res<PlotterCtl<P>>, mut open: ResMut<OpenPlotters>) {
+    if ctl.removed {
+        open.0.remove(ctl.name);
+    } else {
+        open.0.insert(ctl.name);
     }
 }
 
@@ -194,7 +213,9 @@ pub fn select<'a>(
 pub fn add_plotters(app: &mut App, filter: &[String]) {
     // The toolbar's Plotters menu needs these even when nothing is selected.
     app.init_resource::<PlotterNames>()
-        .add_message::<ShowPlotter>();
+        .init_resource::<OpenPlotters>()
+        .add_message::<ShowPlotter>()
+        .add_message::<ClosePlotter>();
     let entries = registry();
     let (picked, unknown) = select(&entries, filter);
     for name in unknown {

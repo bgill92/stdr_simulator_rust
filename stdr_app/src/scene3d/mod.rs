@@ -13,12 +13,14 @@ use bevy::camera::visibility::Visibility;
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll};
 use bevy::prelude::*;
+use bevy::window::PrimaryWindow;
 use bevy_egui::EguiPrimaryContextPass;
 use bevy_egui::input::EguiWantsInput;
 use stdr_core::{Pose2D, RobotId};
 
 use crate::sim::{SimWorld, sim_step};
-use crate::view2d::{MainCamera, MapSprite, MapTexture, scroll_notches, sync_map_texture};
+use crate::ui::toolbar::toolbar;
+use crate::view2d::{MainCamera, MapTexture, cursor_in_viewport, scroll_notches, sync_map_texture};
 use camera_sensor::{CameraFrames, PendingCaptures};
 pub use mesh::{extrude_footprint, extrude_grid};
 
@@ -132,7 +134,10 @@ impl Plugin for Scene3dPlugin {
                     orbit_camera.run_if(in_3d),
                 ),
             )
-            .add_systems(EguiPrimaryContextPass, camera_sensor::cameras_window);
+            .add_systems(
+                EguiPrimaryContextPass,
+                camera_sensor::cameras_tab.after(toolbar),
+            );
     }
 }
 
@@ -148,7 +153,7 @@ fn spawn_scene(mut commands: Commands, mut materials: ResMut<Assets<StandardMate
     ));
     commands.spawn((
         Camera3d::default(),
-        // Under the 2D camera, which keeps drawing egui on top.
+        // Under the egui host camera, which draws the panes on top.
         Camera {
             is_active: false,
             order: -1,
@@ -261,46 +266,32 @@ fn sync_robot_mirrors(
     }
 }
 
-/// 3D: the orbit camera renders the scene; the 2D camera only hosts egui, clearing nothing,
-/// with the map sprite hidden.
+/// The Map pane shows either the 2D camera or the orbit camera.
 fn apply_view_mode(
     mode: Res<ViewMode>,
     mut orbit: Single<&mut Camera, (With<OrbitCamera>, Without<MainCamera>)>,
     mut main: Single<&mut Camera, With<MainCamera>>,
-    mut sprites: Query<&mut Visibility, With<MapSprite>>,
 ) {
     let three_d = *mode == ViewMode::ThreeD;
     if orbit.is_active != three_d {
         orbit.is_active = three_d;
     }
-    let clear = if three_d {
-        ClearColorConfig::None
-    } else {
-        ClearColorConfig::Default
-    };
-    if std::mem::discriminant(&main.clear_color) != std::mem::discriminant(&clear) {
-        main.clear_color = clear;
-    }
-    let vis = if three_d {
-        Visibility::Hidden
-    } else {
-        Visibility::Inherited
-    };
-    for mut v in &mut sprites {
-        v.set_if_neq(vis);
+    if main.is_active == three_d {
+        main.is_active = !three_d;
     }
 }
 
-/// Left-drag orbits, middle-drag pans along the floor, the wheel zooms.
+/// Left-drag orbits, middle-drag pans along the floor, the wheel zooms; only over the Map pane.
 fn orbit_camera(
     egui_input: Res<EguiWantsInput>,
     buttons: Res<ButtonInput<MouseButton>>,
     motion: Res<AccumulatedMouseMotion>,
     scroll: Res<AccumulatedMouseScroll>,
-    cam: Single<(&mut OrbitCamera, &mut Transform)>,
+    window: Single<&Window, With<PrimaryWindow>>,
+    cam: Single<(&Camera, &mut OrbitCamera, &mut Transform)>,
 ) {
-    let (mut orbit, mut t) = cam.into_inner();
-    if !egui_input.wants_pointer_input() {
+    let (camera, mut orbit, mut t) = cam.into_inner();
+    if !egui_input.wants_pointer_input() && cursor_in_viewport(&window, camera).is_some() {
         let d = motion.delta;
         if buttons.pressed(MouseButton::Left) {
             orbit.yaw -= d.x * ORBIT_RAD_PER_PX;

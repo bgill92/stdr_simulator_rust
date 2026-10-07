@@ -70,9 +70,9 @@ stdr_simulator_rust/
     src/cli.rs                # clap: --map --robot --x --y --theta
     src/sim/{mod,commands}.rs # SimPlugin + resources + sim_step; SimCommand/SimEvent + apply_sim_commands
     src/view2d/{map_texture,robots,camera,picking}.rs   # robots.rs = GizmoCanvas + per-frame draw_robot/draw_sensors/draw_trail calls
-    src/ui/{toolbar,robot_info,messages,teleop}.rs      # teleop.rs = teleop_twist(keys, KinematicKind, speeds) pure fn + unit tests
+    src/ui/{toolbar,dock,robot_info,messages,teleop}.rs # teleop.rs = teleop_twist(keys, KinematicKind, speeds) pure fn + unit tests
     src/overlay.rs            # trait Canvas, Style, draw_robot, draw_sensors, draw_trail, geometry helpers (no bevy/egui types)
-    src/plot/mod.rs           # PlotterCtl<P>, add_plotter, plotter_window, PlotterEntry registry,
+    src/plot/mod.rs           # PlotterCtl<P>, add_plotter, plotter_tab, PlotterEntry registry,
                               # Trail<T>, Positioned, TeleportDetector, TimeSeries, SampleGate
     src/plot/overlay_plot.rs  # PlotCanvas (Canvas adapter over egui_plot::PlotUi), map_plot, draw_map
     src/plotters/{pose_error,map_trace,odometry_trace,scan_trace}.rs
@@ -319,7 +319,8 @@ No mirrors (the C++ toolbar shadowed `speed_multiplier_` because the backend had
 - `FixedUpdate`: `sim_step` — `engine.step()` only.
 - `Update`: `sync_robot_mirrors`, `camera_pan_zoom`, `pick_robot`, `right_click_teleport`, `teleop_input`,
   `draw_overlay` (`GizmoCanvas` + `overlay::{draw_robot, draw_sensors, draw_trail}`), plotter `sample` systems (after sync).
-- `EguiPrimaryContextPass`: `toolbar`, `robot_info`, `messages`, `teleop_window`, plotter `render` systems.
+- `EguiPrimaryContextPass`: `toolbar` (menu bar, status bar, and the dock layout into `Dock`), then `robot_info`,
+  `teleop_pane`, `apply_map_viewport` and plotter `render` systems, each drawing into its `Dock` pane.
   Toolbar/status read `Time<Virtual>::{is_paused, relative_speed}`, `engine.step_dt()`, `engine.sim_time()` directly.
 
 **Time mapping**
@@ -366,8 +367,8 @@ No trait. Each plotter = one `Resource` state type `P: Default` + a sample syste
 // plot/mod.rs
 #[derive(Resource)] pub struct PlotterCtl<P> { pub paused: bool, pub removed: bool, _p: PhantomData<P> }
 pub fn plotter_active<P: 'static>(c: Res<PlotterCtl<P>>) -> bool { !c.paused && !c.removed }
-pub fn plotter_window<P>(ctx: &egui::Context, ctl: &mut PlotterCtl<P>, name: &str, body: impl FnOnce(&mut egui::Ui));
-    // egui::Window(name) with Pause checkbox + Remove button, then body
+pub fn plotter_tab<P>(ctx: &egui::Context, dock: &Dock, ctl: &mut PlotterCtl<P>, body: impl FnOnce(&mut egui::Ui));
+    // the plotter's Plots tab, drawn only while selected: Pause checkbox, then body; the tab's × removes it
 pub fn add_plotter<P: Resource + Default>(app: &mut App, sample: impl IntoSystemConfigs<M1>, render: impl IntoSystemConfigs<M2>) {
     app.init_resource::<P>().init_resource::<PlotterCtl<P>>()
        .add_systems(Update, sample.after(sync_robot_mirrors).run_if(plotter_active::<P>))
@@ -402,8 +403,8 @@ fn sample(sim: Res<SimWorld>, sel: Res<Selection>, mut st: ResMut<PoseError>, mu
     let e = overlay::pose_error(r.state.pose, r.state.odom_pose);
     st.xy.push(t, e.xy); st.th.push(t, e.theta);
 }
-fn render(mut ctx: EguiContexts, st: Res<PoseError>, mut ctl: ResMut<PlotterCtl<PoseError>>) {
-    plotter_window(ctx.ctx_mut(), &mut ctl, "Pose Error", |ui| {
+fn render(mut ctx: EguiContexts, st: Res<PoseError>, dock: Res<Dock>, mut ctl: ResMut<PlotterCtl<PoseError>>) {
+    plotter_tab(ctx.ctx_mut(), &dock, &mut ctl, |ui| {
         Plot::new("pose_error").x_axis_label("sim time (s)").show(ui, |p| { p.line(st.xy.line("|truth - odom| (m)")); p.line(st.th.line("yaw error (rad)")); });
     });
 }
@@ -422,7 +423,7 @@ register_plotter!(PoseError, "Pose Error", "Drives the selected robot in a circl
   adjusted on `Pushed { evicted_front: true }`; click pick via `plot_ui.pointer_coordinate()` + `transform().position_from_point()` ≤ 8 px;
   right-click clears; only the selected scan rendered (never all 500).
 - The C++ "lazy first robot" and "fetch footprint once" blocks vanish: read `Selection` + `sim.robot(id).config` each sample (a map lookup).
-- No egui_dock; plain `egui::Window`s. Add docking only if layout becomes a problem.
+- No egui_dock: `ui/dock.rs` lays out fixed panes like the C++ GUI (Map + Robot Info/Teleop left, Plots tabs right).
 
 **`plot/overlay_plot.rs`**: `PlotCanvas` (the `Canvas` adapter over `PlotUi`), `map_plot(id, lock_view) -> Plot`
 (equal aspect, inputs off when locked), `draw_map(plot_ui, &MapTexture)`, colour consts `TRUTH`, `ODOM`, `SCAN`.
@@ -515,7 +516,7 @@ an ear-clipped top cap, so concave footprints such as `random_shape_robot.yaml` 
   `PendingCaptures`; each Update a camera is active iff it is pending, then the set is cleared.
   So a camera renders on frames where at least one of its ticks fired, and a paused sim keeps the
   last picture.
-- A "Cameras" egui window shows every `CameraFrames` image (`EguiUserTextures`, no GPU readback).
+- A "Cameras" Plots tab shows every `CameraFrames` image (`EguiUserTextures`, no GPU readback).
   No new plotter; readback waits until a plotter needs pixels.
 
 Tests: `scene3d::mesh` unit tests (one-cell grid: 20 vertices, 30 indices, bounds = the cell ×

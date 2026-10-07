@@ -13,10 +13,11 @@ use stdr_core::{CameraSpec, Pose2D, RobotId, RobotRuntime, SensorConfig};
 
 use super::ROBOT_HEIGHT;
 use crate::sim::SimWorld;
+use crate::ui::dock::{CAMERAS_TAB, Dock, show_pane};
 
 /// Lens height above the floor: just over the robot body so its own top is out of view.
 pub const CAMERA_Z: f32 = ROBOT_HEIGHT + 0.05;
-/// Widest a camera image is drawn in the Cameras window, in logical pixels.
+/// Widest a camera image is drawn in the Cameras tab, in logical pixels.
 const MAX_DISPLAY_WIDTH: f32 = 320.0;
 
 /// Each camera sensor's render target, by `(robot, sensor index)`. Entries live as long as the robot.
@@ -111,8 +112,9 @@ pub fn apply_captures(
     pending.0.clear();
 }
 
-pub fn cameras_window(
+pub fn cameras_tab(
     mut ctx: EguiContexts,
+    dock: Res<Dock>,
     frames: Res<CameraFrames>,
     sim: Res<SimWorld>,
 ) -> Result {
@@ -126,9 +128,11 @@ pub fn cameras_window(
         .map(|(&key, image)| (key, ctx.add_image(EguiTextureHandle::Weak(image.id()))))
         .collect();
     cams.sort_by_key(|&(key, _)| key);
-    egui::Window::new("Cameras")
-        .default_pos([10.0, 400.0])
-        .show(ctx.ctx_mut()?, |ui| {
+    show_pane(
+        ctx.ctx_mut()?,
+        "cameras",
+        dock.tab_body(CAMERAS_TAB),
+        |ui| {
             for ((id, i), tex) in cams {
                 let Some(sensor) = sim.robot(id).map(|r| &r.config.sensors[i]) else {
                     continue;
@@ -141,7 +145,8 @@ pub fn cameras_window(
                 let size = size * (MAX_DISPLAY_WIDTH / size.x).min(1.0);
                 ui.image(egui::load::SizedTexture::new(tex, size));
             }
-        });
+        },
+    );
     Ok(())
 }
 

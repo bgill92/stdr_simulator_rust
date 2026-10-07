@@ -15,11 +15,11 @@ the design and milestone plan live in [PLAN.md](PLAN.md).
   click-to-select, right-click teleport/delete, WASD/QE keyboard teleop, and egui toolbar,
   robot info and message panels. The simulation runs in Bevy's fixed timestep, starts paused,
   and caps catch-up at 0.25 s of sim time per frame.
-- **M3 (done):** plotter windows over the map and sim time: Pose Error, Map Trace, Odometry
+- **M3 (done):** plotters over the map and sim time: Pose Error, Map Trace, Odometry
   Trace and Scan Trace, compiled in and selected with `--plotter`.
 - **M4 (done):** 3D view of the extruded map and robots (toolbar 2D/3D toggle; left-drag orbits,
   middle-drag pans, wheel zooms) and a camera sensor: the core schedules it, the app renders each
-  camera into an image shown in the Cameras window.
+  camera into an image shown in the Cameras tab.
 
 ## Build and test
 
@@ -48,10 +48,18 @@ STDR_RESOURCES_DIR=stdr_resources/resources cargo run -p stdr_app -- \
   --robot stdr_resources/resources/robots/simple_robot_realistic.yaml --x 3 --y 2 --theta 1.57
 ```
 
+The window is docked like the C++ GUI, with nothing floating over the map: the menu bar
+(File, Simulation, Plotters) and the Start/Pause/Reset + 2D/3D row across the top; on the left
+the Map pane (the 2D or 3D view renders only inside it, and only there do clicks, pan/zoom and
+the right-click menu act on the map) with Robot Info and Teleop docked below it; on the right the
+Plots pane, one tab per open plotter plus a Cameras tab while a camera sensor exists; and a status
+bar along the bottom with paused state, speed, dt, sim time and the latest message (hover it for
+the full log). Drag the pane borders to resize; the 2D map refits to its pane on resize.
+
 Every plotter opens by default; `--plotter KEY` (repeatable: `PoseError`, `MapTrace`,
-`OdometryTrace`, `ScanTrace`) opens only those, and the Plotters menu re-opens a closed one. Pose
-Error drives the selected robot in a circle while it is open; held teleop keys override it, and
-pausing or closing it stops the robot.
+`OdometryTrace`, `ScanTrace`) opens only those. A tab's × closes its plotter and the Plotters menu
+re-opens it. Pose Error drives the selected robot in a circle while it is open; held teleop keys
+override it, and pausing or closing it stops the robot.
 
 `--x/--y/--theta` override the robot yaml's `initial_pose` field by field; without them the yaml
 pose is used. Robots loaded through File → Load Robot resolve includes the same way, so start the
