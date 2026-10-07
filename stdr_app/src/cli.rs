@@ -22,6 +22,10 @@ pub struct Cli {
     /// Spawn heading in radians [default: the robot yaml's initial_pose].
     #[arg(long)]
     pub theta: Option<f64>,
+    /// Open only this plotter, by key (repeatable) [default: all]. Keys: PoseError, MapTrace,
+    /// OdometryTrace, ScanTrace.
+    #[arg(long = "plotter", value_name = "KEY")]
+    pub plotters: Vec<String>,
 }
 
 impl Cli {

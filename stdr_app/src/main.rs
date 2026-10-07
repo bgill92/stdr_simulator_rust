@@ -4,6 +4,7 @@ use bevy::prelude::*;
 use bevy_egui::EguiPlugin;
 use clap::Parser;
 use stdr_app::cli::Cli;
+use stdr_app::plot::add_plotters;
 use stdr_app::sim::{SimEvent, SimPlugin, SimWorld, load_robot};
 use stdr_app::ui::UiPlugin;
 use stdr_app::view2d::View2dPlugin;
@@ -57,6 +58,7 @@ fn main() -> ExitCode {
         UiPlugin,
     ))
     .insert_resource(sim);
+    add_plotters(&mut app, &cli.plotters);
     for e in events {
         app.world_mut().write_message(e);
     }

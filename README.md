@@ -15,7 +15,9 @@ the design and milestone plan live in [PLAN.md](PLAN.md).
   click-to-select, right-click teleport/delete, WASD/QE keyboard teleop, and egui toolbar,
   robot info and message panels. The simulation runs in Bevy's fixed timestep, starts paused,
   and caps catch-up at 0.25 s of sim time per frame.
-- **M3–M4 (not started):** plotters, 3D scene + camera sensor. See PLAN.md for details.
+- **M3 (done):** plotter windows over the map and sim time: Pose Error, Map Trace, Odometry
+  Trace and Scan Trace, compiled in and selected with `--plotter`.
+- **M4 (not started):** 3D scene + camera sensor. See PLAN.md for details.
 
 ## Build and test
 
@@ -43,6 +45,10 @@ STDR_RESOURCES_DIR=stdr_resources/resources cargo run -p stdr_app -- \
   --map stdr_resources/maps/sparse_obstacles.yaml \
   --robot stdr_resources/resources/robots/simple_robot_realistic.yaml --x 3 --y 2 --theta 1.57
 ```
+
+Every plotter opens by default; `--plotter KEY` (repeatable: `PoseError`, `MapTrace`,
+`OdometryTrace`, `ScanTrace`) opens only those, and the Plotters menu re-opens a closed one. Pose
+Error drives the selected robot in a circle while it is open: pause or close it to teleop.
 
 `--x/--y/--theta` override the robot yaml's `initial_pose` field by field; without them the yaml
 pose is used. Robots loaded through File → Load Robot resolve includes the same way, so start the

@@ -2,7 +2,9 @@
 //! coordinates with `[u8; 4]` colours, so neither bevy nor egui types appear here; adapters
 //! (`GizmoCanvas` for the 2D view, a `RecordingCanvas` in tests) decide how to draw it.
 
-use stdr_core::{Footprint, LaserScan, Measurement, Point2D, Pose2D, RobotRuntime, SensorConfig};
+use stdr_core::{
+    Footprint, LaserScan, Measurement, Point2D, Pose2D, RobotRuntime, SensorConfig, angle_diff,
+};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Style {
@@ -133,16 +135,17 @@ pub fn heading_segment(fp: &Footprint, pose: Pose2D) -> [[f64; 2]; 2] {
     [[pose.x, pose.y], xy(tip)]
 }
 
-/// World endpoint of every finite range; REP-117 infinities (no return, too close) are skipped.
+/// World endpoint of every finite range within `[range_min, range_max]`; REP-117 infinities (no
+/// return, too close) and NaN are skipped.
 pub fn scan_endpoints(scan: &LaserScan, sensor_pose: Pose2D) -> Vec<[f64; 2]> {
     scan.ranges
         .iter()
         .enumerate()
-        .filter(|(_, r)| r.is_finite())
-        .map(|(i, &r)| {
+        .map(|(i, &r)| (i, f64::from(r)))
+        .filter(|&(_, r)| r.is_finite() && (scan.range_min..=scan.range_max).contains(&r))
+        .map(|(i, r)| {
             let a = scan.angle_min + i as f64 * scan.angle_increment;
             let (s, c) = a.sin_cos();
-            let r = f64::from(r);
             xy(sensor_pose.transform_point(Point2D { x: r * c, y: r * s }))
         })
         .collect()
@@ -165,6 +168,22 @@ pub fn sonar_cone(cone_angle: f64, range: f64, sensor_pose: Pose2D) -> Option<[[
         edge(cone_angle / 2.0),
         edge(-cone_angle / 2.0),
     ])
+}
+
+/// How far odometry has drifted from the truth.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct PoseError {
+    /// Position error, metres.
+    pub xy: f64,
+    /// Heading error `truth - odom`, wrapped to (-π, π].
+    pub theta: f64,
+}
+
+pub fn pose_error(truth: Pose2D, odom: Pose2D) -> PoseError {
+    PoseError {
+        xy: (truth.x - odom.x).hypot(truth.y - odom.y),
+        theta: angle_diff(truth.theta, odom.theta),
+    }
 }
 
 #[cfg(test)]
@@ -273,6 +292,7 @@ mod tests {
         let scan = LaserScan {
             angle_min: -std::f64::consts::FRAC_PI_2,
             angle_increment: std::f64::consts::FRAC_PI_2,
+            range_max: 5.0,
             ranges: vec![1.0, f32::INFINITY, 2.0, f32::NEG_INFINITY],
             ..Default::default()
         };
@@ -295,5 +315,69 @@ mod tests {
         assert_eq!(apex, [0.0, 0.0]);
         assert!(left[1] > 0.0 && right[1] < 0.0);
         assert!((left[0] - 2f64.sqrt()).abs() < 1e-12);
+    }
+}
+
+// C++ `PlotHelpers.ScanToMapPoints*`, on `scan_endpoints` with the sensor pose composed as
+// `robot_in_map * laser_in_robot`.
+#[cfg(test)]
+#[allow(non_snake_case)]
+mod PlotHelpers {
+    use super::scan_endpoints;
+    use stdr_core::{LaserScan, Pose2D};
+
+    fn one_angle(range_min: f64, range_max: f64, ranges: Vec<f32>) -> LaserScan {
+        LaserScan {
+            angle_min: 0.0,
+            angle_increment: 0.0,
+            range_min,
+            range_max,
+            ranges,
+            ..Default::default()
+        }
+    }
+
+    fn near(p: [f64; 2], x: f64, y: f64) -> bool {
+        (p[0] - x).abs() < 1e-9 && (p[1] - y).abs() < 1e-9
+    }
+
+    #[test]
+    fn ScanToMapPointsEmptyScanIsEmpty() {
+        assert!(scan_endpoints(&LaserScan::default(), Pose2D::default()).is_empty());
+    }
+
+    #[test]
+    fn ScanToMapPointsSkipsOutOfRangeAndNonFiniteRays() {
+        let scan = one_angle(0.1, 5.0, vec![0.05, 6.0, f32::NAN, f32::INFINITY, 2.0]);
+        let pts = scan_endpoints(&scan, Pose2D::default());
+        assert_eq!(pts.len(), 1);
+        assert!(near(pts[0], 2.0, 0.0));
+    }
+
+    #[test]
+    fn ScanToMapPointsSingleRayAtIdentityPosesLandsOnXAxis() {
+        let pts = scan_endpoints(&one_angle(0.0, 10.0, vec![3.0]), Pose2D::default());
+        assert_eq!(pts.len(), 1);
+        assert!(near(pts[0], 3.0, 0.0));
+    }
+
+    #[test]
+    fn ScanToMapPointsRotatedRobotWithOffsetLaser() {
+        let laser_in_robot = Pose2D {
+            x: 0.2,
+            y: 0.0,
+            theta: 0.0,
+        };
+        let robot_in_map = Pose2D {
+            x: 0.0,
+            y: 0.0,
+            theta: std::f64::consts::FRAC_PI_2,
+        };
+        let pts = scan_endpoints(
+            &one_angle(0.0, 10.0, vec![1.0]),
+            robot_in_map * laser_in_robot,
+        );
+        assert_eq!(pts.len(), 1);
+        assert!(near(pts[0], 0.0, 1.2));
     }
 }
