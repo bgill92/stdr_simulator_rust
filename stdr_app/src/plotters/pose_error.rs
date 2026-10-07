@@ -6,7 +6,7 @@ use egui_plot::{Legend, Plot};
 use stdr_core::{RobotId, Twist2D};
 
 use crate::overlay;
-use crate::plot::{PlotterCtl, SampleGate, TimeSeries, add_plotter, plotter_window};
+use crate::plot::{PlotterCtl, PlotterSample, SampleGate, TimeSeries, add_plotter, plotter_window};
 use crate::register_plotter;
 use crate::sim::{Selection, SimCommand, SimWorld};
 
@@ -117,6 +117,6 @@ register_plotter!(
     "Drives the selected robot in a circle and plots truth vs odometry.",
     |app| {
         add_plotter::<PoseError, _, _>(app, NAME, sample, render);
-        app.add_systems(Update, stop_when_inactive);
+        app.add_systems(Update, stop_when_inactive.in_set(PlotterSample));
     }
 );

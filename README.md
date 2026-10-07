@@ -48,7 +48,8 @@ STDR_RESOURCES_DIR=stdr_resources/resources cargo run -p stdr_app -- \
 
 Every plotter opens by default; `--plotter KEY` (repeatable: `PoseError`, `MapTrace`,
 `OdometryTrace`, `ScanTrace`) opens only those, and the Plotters menu re-opens a closed one. Pose
-Error drives the selected robot in a circle while it is open: pause or close it to teleop.
+Error drives the selected robot in a circle while it is open; held teleop keys override it, and
+pausing or closing it stops the robot.
 
 `--x/--y/--theta` override the robot yaml's `initial_pose` field by field; without them the yaml
 pose is used. Robots loaded through File → Load Robot resolve includes the same way, so start the

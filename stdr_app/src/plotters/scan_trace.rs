@@ -100,6 +100,9 @@ fn sample(sim: Res<SimWorld>, sel: Res<Selection>, mut st: ResMut<ScanTrace>) {
         st.samples.clear();
         st.selected = None;
     }
+    if !st.samples.accepts(r.state.pose.position()) {
+        return;
+    }
     let scan = first_laser(r).and_then(|i| r.data[i].as_ref()?.as_laser().cloned());
     let pushed = st.samples.push_if_moved(Sample {
         truth: r.state.pose,

@@ -624,6 +624,50 @@ fn every_plotter_is_registered_and_samples_headless() {
 }
 
 #[test]
+fn held_teleop_keys_override_pose_error() {
+    let mut app = app();
+    app.add_plugins(TeleopPlugin)
+        .init_resource::<ButtonInput<KeyCode>>();
+    add_plotters(&mut app, &["PoseError".into()]);
+    let id = sim_mut(&mut app).spawn(RobotConfig::default(), Pose2D::default());
+    app.world_mut().resource_mut::<Selection>().robot = Some(id);
+    let cmd_vel = |app: &App| sim(app).robot(id).unwrap().state.cmd_vel;
+    let drive = Twist2D {
+        linear_x: 0.3,
+        linear_y: 0.0,
+        angular_z: 0.5,
+    };
+
+    app.update();
+    app.update();
+    assert_eq!(cmd_vel(&app), drive);
+
+    // Both write CmdVel every frame; teleop's comes last, so it is the one applied.
+    keys(&mut app).press(KeyCode::KeyW);
+    app.update();
+    for _ in 0..5 {
+        app.update();
+        assert_eq!(
+            cmd_vel(&app),
+            Twist2D {
+                linear_x: 0.5,
+                ..Default::default()
+            }
+        );
+    }
+
+    keys(&mut app).release(KeyCode::KeyW);
+    app.update();
+    app.update();
+    app.update();
+    assert_eq!(
+        cmd_vel(&app),
+        drive,
+        "Pose Error resumes once the keys are released"
+    );
+}
+
+#[test]
 fn plotter_filter_builds_only_the_named_plotters() {
     let mut app = app();
     add_plotters(

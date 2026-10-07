@@ -81,6 +81,11 @@ impl Default for LockView {
 #[derive(Resource, Default)]
 pub struct PlotterNames(pub Vec<&'static str>);
 
+/// Every plotter's sample systems. Teleop runs after it, so held keys override a plotter that
+/// drives the robot.
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PlotterSample;
+
 /// Re-open the named plotter after its window was closed.
 #[derive(Message, Clone, Debug, PartialEq)]
 pub struct ShowPlotter(pub &'static str);
@@ -97,7 +102,10 @@ pub fn add_plotter<P: Resource<Mutability = Mutable> + Default, M1, M2>(
     app.init_resource::<P>()
         .insert_resource(PlotterCtl::<P>::new(name, slot))
         .add_message::<ShowPlotter>()
-        .add_systems(Update, sample.run_if(plotter_active::<P>))
+        .add_systems(
+            Update,
+            sample.run_if(plotter_active::<P>).in_set(PlotterSample),
+        )
         .add_systems(
             EguiPrimaryContextPass,
             render.run_if(|c: Res<PlotterCtl<P>>| !c.removed),
@@ -246,13 +254,18 @@ impl<T: Positioned> Trail<T> {
         }
     }
 
+    /// Whether a sample at `p` would be appended: at least `spacing` from the last one.
+    pub fn accepts(&self, p: Point2D) -> bool {
+        self.xy
+            .last()
+            .is_none_or(|&[x, y]| (p.x - x).hypot(p.y - y) >= self.spacing)
+    }
+
     /// Appends `t` unless it is within `spacing` of the last sample; drops the oldest sample
     /// past `cap`.
     pub fn push_if_moved(&mut self, t: T) -> Push {
         let p = t.position();
-        if let Some(&[x, y]) = self.xy.last()
-            && (p.x - x).hypot(p.y - y) < self.spacing
-        {
+        if !self.accepts(p) {
             return Push::Skipped;
         }
         self.buf.push_back(t);

@@ -6,6 +6,7 @@ use bevy_egui::input::EguiWantsInput;
 use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
 use stdr_core::{KinematicKind, RobotId, Twist2D};
 
+use crate::plot::PlotterSample;
 use crate::sim::{Selection, SimCommand, SimWorld};
 
 #[derive(Clone, Copy, PartialEq, Debug, Default)]
@@ -79,7 +80,7 @@ impl Plugin for TeleopPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<TeleopState>()
             .init_resource::<EguiWantsInput>()
-            .add_systems(Update, teleop_input)
+            .add_systems(Update, teleop_input.after(PlotterSample))
             .add_systems(EguiPrimaryContextPass, teleop_window);
     }
 }
