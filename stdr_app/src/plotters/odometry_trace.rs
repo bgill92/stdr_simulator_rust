@@ -10,10 +10,11 @@ use crate::overlay;
 use crate::plot::overlay_plot::{ODOM, PlotCanvas, TRUTH, color32, draw_map, map_plot};
 use crate::plot::{
     LockView, MARKER_SPACING, MAX_MARKERS, PlotterCtl, Positioned, TeleportDetector, Trail,
-    add_plotter, plotter_window,
+    add_plotter, plotter_tab,
 };
 use crate::register_plotter;
 use crate::sim::{Selection, SimWorld};
+use crate::ui::dock::Dock;
 use crate::view2d::MapTexture;
 
 const NAME: &str = "Odometry Trace";
@@ -76,6 +77,7 @@ pub(super) fn error_readout(ui: &mut egui::Ui, r: &stdr_core::RobotRuntime) {
 
 fn render(
     mut ctx: EguiContexts,
+    dock: Res<Dock>,
     sim: Res<SimWorld>,
     tex: Res<MapTexture>,
     st: Res<OdometryTrace>,
@@ -83,7 +85,7 @@ fn render(
     mut lock: Local<LockView>,
 ) -> Result {
     let robot = st.robot.and_then(|id| sim.robot(id));
-    plotter_window(ctx.ctx_mut()?, &mut ctl, |ui| {
+    plotter_tab(ctx.ctx_mut()?, &dock, &mut ctl, |ui| {
         map_plot("odometry_trace", lock.0).show(ui, |p| {
             draw_map(p, &tex);
             let mut c = PlotCanvas(p);

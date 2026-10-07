@@ -1,7 +1,6 @@
 use std::collections::VecDeque;
 
 use bevy::prelude::*;
-use bevy_egui::{EguiContexts, egui};
 
 use crate::sim::SimEvent;
 
@@ -36,21 +35,4 @@ pub fn log_sim_events(mut events: MessageReader<SimEvent>, mut log: ResMut<Messa
             log.0.pop_front();
         }
     }
-}
-
-pub fn messages_window(mut ctx: EguiContexts, log: Res<MessageLog>) -> Result {
-    egui::Window::new("Messages")
-        .default_open(false)
-        .anchor(egui::Align2::RIGHT_BOTTOM, [-10.0, -40.0])
-        .show(ctx.ctx_mut()?, |ui| {
-            egui::ScrollArea::vertical()
-                .stick_to_bottom(true)
-                .max_height(200.0)
-                .show(ui, |ui| {
-                    for m in &log.0 {
-                        ui.label(m);
-                    }
-                });
-        });
-    Ok(())
 }

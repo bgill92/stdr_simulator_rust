@@ -6,7 +6,10 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 use bevy::time::TimeUpdateStrategy;
-use stdr_app::plot::{PlotterCtl, PlotterNames, ShowPlotter, add_plotter, add_plotters, registry};
+use stdr_app::plot::{
+    ClosePlotter, OpenPlotters, PlotterCtl, PlotterNames, ShowPlotter, add_plotter, add_plotters,
+    registry,
+};
 use stdr_app::sim::{Selection, SimCommand, SimEvent, SimPlugin, SimWorld};
 use stdr_app::ui::teleop::{TeleopPlugin, TeleopState};
 use stdr_app::ui::toolbar::status_text;
@@ -579,6 +582,23 @@ fn showing_a_removed_plotter_restarts_it() {
     app.update();
     assert!(!ctl(&mut app).removed);
     assert_eq!(samples(&app), 1);
+}
+
+#[test]
+fn closing_a_plotter_tab_removes_it_until_shown_again() {
+    let mut app = fixture_plotter_app();
+    let tab_open = |app: &App| app.world().resource::<OpenPlotters>().0.contains("Fixture");
+    app.update();
+    assert!(tab_open(&app));
+    app.world_mut().write_message(ClosePlotter("Fixture"));
+    app.update();
+    assert!(ctl(&mut app).removed);
+    assert!(!tab_open(&app));
+    assert_eq!(samples(&app), 1, "a closed plotter stops sampling");
+    app.world_mut().write_message(ShowPlotter("Fixture"));
+    app.update();
+    assert!(tab_open(&app));
+    assert_eq!(samples(&app), 1, "restarted from its default state");
 }
 
 #[test]

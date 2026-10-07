@@ -12,10 +12,11 @@ use crate::overlay::{self, Canvas};
 use crate::plot::overlay_plot::{ODOM, PlotCanvas, SCAN, TRUTH, draw_map, map_plot};
 use crate::plot::{
     LockView, MARKER_SPACING, MAX_MARKERS, PlotterCtl, Positioned, Push, TeleportDetector, Trail,
-    add_plotter, plotter_window,
+    add_plotter, plotter_tab,
 };
 use crate::register_plotter;
 use crate::sim::{Selection, SimWorld};
+use crate::ui::dock::Dock;
 use crate::view2d::MapTexture;
 
 const NAME: &str = "Scan Trace";
@@ -140,6 +141,7 @@ fn pick(
 
 fn render(
     mut ctx: EguiContexts,
+    dock: Res<Dock>,
     sim: Res<SimWorld>,
     tex: Res<MapTexture>,
     mut st: ResMut<ScanTrace>,
@@ -148,7 +150,7 @@ fn render(
 ) -> Result {
     let robot = st.robot.and_then(|id| sim.robot(id));
     let laser = robot.and_then(|r| Some((r, first_laser(r)?)));
-    plotter_window(ctx.ctx_mut()?, &mut ctl, |ui| {
+    plotter_tab(ctx.ctx_mut()?, &dock, &mut ctl, |ui| {
         let st = &mut *st;
         let shown = st
             .selected

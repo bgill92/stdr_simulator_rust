@@ -1,4 +1,5 @@
-//! Menu bar, Start/Pause/Reset control bar with the 2D/3D toggle, status bar and the spawn dialog.
+//! Menu bar, Start/Pause/Reset control bar with the 2D/3D toggle, status bar, the docked pane
+//! layout and the spawn dialog.
 
 use std::path::PathBuf;
 
@@ -6,9 +7,11 @@ use bevy::prelude::*;
 use bevy_egui::{EguiContexts, egui};
 use stdr_core::{Pose2D, SimulationEngine};
 
+use super::dock::{self, Dock};
 use super::messages::MessageLog;
-use crate::plot::{PlotterNames, ShowPlotter};
+use crate::plot::{ClosePlotter, OpenPlotters, PlotterNames, ShowPlotter};
 use crate::scene3d::ViewMode;
+use crate::scene3d::camera_sensor::CameraFrames;
 use crate::sim::{SimCommand, SimEvent, SimWorld, load_robot};
 
 pub const SPEEDS: [f64; 4] = [0.5, 1.0, 2.0, 5.0];
@@ -66,6 +69,29 @@ fn pick_yaml(title: &str) -> Option<PathBuf> {
         .pick_file()
 }
 
+/// Status line plus the newest message; hovering it shows the whole log.
+fn status_bar(ui: &mut egui::Ui, virt: &Time<Virtual>, sim: &SimulationEngine, log: &MessageLog) {
+    ui.horizontal(|ui| {
+        ui.label(status_text(virt, sim));
+        if let Some(last) = log.0.back() {
+            ui.separator();
+            ui.colored_label(egui::Color32::from_rgb(255, 153, 51), last)
+                .on_hover_ui(|ui| {
+                    egui::ScrollArea::vertical()
+                        .stick_to_bottom(true)
+                        .max_height(300.0)
+                        .show(ui, |ui| {
+                            for m in &log.0 {
+                                ui.label(m);
+                            }
+                        });
+                });
+        }
+    });
+}
+
+/// Every pane but the map's own drawing: menu bar and control row on top, status bar at the
+/// bottom, then the [`dock`] split of what is left.
 #[allow(clippy::too_many_arguments)]
 pub fn toolbar(
     mut ctx: EguiContexts,
@@ -73,103 +99,88 @@ pub fn toolbar(
     sim: Res<SimWorld>,
     log: Res<MessageLog>,
     mut spawn: ResMut<SpawnDialog>,
-    plotters: Res<PlotterNames>,
+    (plotters, open, frames): (Res<PlotterNames>, Res<OpenPlotters>, Res<CameraFrames>),
+    mut dock: ResMut<Dock>,
     mut view: ResMut<ViewMode>,
     mut cmd: MessageWriter<SimCommand>,
     mut events: MessageWriter<SimEvent>,
-    mut show: MessageWriter<ShowPlotter>,
+    (mut show, mut close): (MessageWriter<ShowPlotter>, MessageWriter<ClosePlotter>),
     mut exit: MessageWriter<AppExit>,
 ) -> Result {
     let ctx = ctx.ctx_mut()?;
-    let width = ctx.content_rect().width();
-    // Areas rather than panels: bevy_egui gives no root `Ui`, and a background-layer root
-    // would make egui claim the pointer over the whole map.
-    egui::Area::new("toolbar".into())
-        .fixed_pos([0.0, 0.0])
-        .show(ctx, |ui| {
-            egui::Frame::side_top_panel(ui.style()).show(ui, |ui| {
-                ui.set_width(width);
-                egui::MenuBar::new().ui(ui, |ui| {
-                    ui.menu_button("File", |ui| {
-                        if ui.button("Load Map...").clicked() {
-                            ui.close();
-                            if let Some(path) = pick_yaml("Load Map") {
-                                cmd.write(SimCommand::LoadMap(path));
+    let mut root = egui::Ui::new(
+        ctx.clone(),
+        egui::Id::new("dock_root"),
+        egui::UiBuilder::new().max_rect(ctx.content_rect()),
+    );
+    egui::Panel::top("toolbar").show(&mut root, |ui| {
+        egui::MenuBar::new().ui(ui, |ui| {
+            ui.menu_button("File", |ui| {
+                if ui.button("Load Map...").clicked() {
+                    ui.close();
+                    if let Some(path) = pick_yaml("Load Map") {
+                        cmd.write(SimCommand::LoadMap(path));
+                    }
+                }
+                if ui.button("Load Robot...").clicked() {
+                    ui.close();
+                    if let Some(path) = pick_yaml("Load Robot") {
+                        // Read now only to prefill the dialog with the yaml pose.
+                        match load_robot(&path) {
+                            Ok((cfg, _)) => spawn.0 = Some((path, cfg.initial_pose)),
+                            Err(e) => {
+                                events.write(SimEvent::Log(format!("Failed to load robot: {e}")));
                             }
                         }
-                        if ui.button("Load Robot...").clicked() {
-                            ui.close();
-                            if let Some(path) = pick_yaml("Load Robot") {
-                                // Read now only to prefill the dialog with the yaml pose.
-                                match load_robot(&path) {
-                                    Ok((cfg, _)) => spawn.0 = Some((path, cfg.initial_pose)),
-                                    Err(e) => {
-                                        events.write(SimEvent::Log(format!(
-                                            "Failed to load robot: {e}"
-                                        )));
-                                    }
-                                }
-                            }
-                        }
-                        ui.separator();
-                        if ui.button("Exit").clicked() {
-                            exit.write(AppExit::Success);
-                        }
-                    });
-                    ui.menu_button("Simulation", |ui| {
-                        sim_buttons(ui, &mut cmd);
-                        ui.separator();
-                        for s in SPEEDS {
-                            let on = virt.relative_speed_f64() == s;
-                            if ui.radio(on, format!("Speed {s}x")).clicked() {
-                                cmd.write(SimCommand::SetSpeed(s));
-                                ui.close();
-                            }
-                        }
-                        ui.separator();
-                        ui.menu_button("Timestep", |ui| {
-                            for (dt, label) in TIMESTEPS {
-                                let on = (sim.step_dt() - dt).abs() < 1e-9;
-                                if ui.radio(on, label).clicked() {
-                                    cmd.write(SimCommand::SetStepDt(dt));
-                                    ui.close();
-                                }
-                            }
-                        });
-                    });
-                    // Re-opens a plotter whose window was closed.
-                    ui.menu_button("Plotters", |ui| {
-                        for &name in &plotters.0 {
-                            if ui.button(name).clicked() {
-                                show.write(ShowPlotter(name));
-                                ui.close();
-                            }
-                        }
-                    });
-                });
-                ui.horizontal(|ui| {
-                    sim_buttons(ui, &mut cmd);
-                    ui.separator();
-                    ui.selectable_value(&mut *view, ViewMode::TwoD, "2D");
-                    ui.selectable_value(&mut *view, ViewMode::ThreeD, "3D");
-                });
+                    }
+                }
+                ui.separator();
+                if ui.button("Exit").clicked() {
+                    exit.write(AppExit::Success);
+                }
             });
-        });
-
-    egui::Area::new("status_bar".into())
-        .anchor(egui::Align2::LEFT_BOTTOM, [0.0, 0.0])
-        .show(ctx, |ui| {
-            egui::Frame::side_top_panel(ui.style()).show(ui, |ui| {
-                ui.set_width(width);
-                ui.horizontal(|ui| {
-                    ui.label(status_text(&virt, &sim));
-                    if let Some(last) = log.0.back() {
-                        ui.separator();
-                        ui.colored_label(egui::Color32::from_rgb(255, 153, 51), last);
+            ui.menu_button("Simulation", |ui| {
+                sim_buttons(ui, &mut cmd);
+                ui.separator();
+                for s in SPEEDS {
+                    let on = virt.relative_speed_f64() == s;
+                    if ui.radio(on, format!("Speed {s}x")).clicked() {
+                        cmd.write(SimCommand::SetSpeed(s));
+                        ui.close();
+                    }
+                }
+                ui.separator();
+                ui.menu_button("Timestep", |ui| {
+                    for (dt, label) in TIMESTEPS {
+                        let on = (sim.step_dt() - dt).abs() < 1e-9;
+                        if ui.radio(on, label).clicked() {
+                            cmd.write(SimCommand::SetStepDt(dt));
+                            ui.close();
+                        }
                     }
                 });
             });
+            // Re-opens a plotter whose tab was closed, and selects its tab.
+            ui.menu_button("Plotters", |ui| {
+                for &name in &plotters.0 {
+                    if ui.button(name).clicked() {
+                        show.write(ShowPlotter(name));
+                        dock.active_tab = Some(name);
+                        ui.close();
+                    }
+                }
+            });
         });
+        ui.horizontal(|ui| {
+            sim_buttons(ui, &mut cmd);
+            ui.separator();
+            ui.selectable_value(&mut *view, ViewMode::TwoD, "2D");
+            ui.selectable_value(&mut *view, ViewMode::ThreeD, "3D");
+        });
+    });
+    egui::Panel::bottom("status_bar").show(&mut root, |ui| status_bar(ui, &virt, &sim, &log));
+    let tabs = dock::plot_tabs(&plotters.0, |n| open.0.contains(n), !frames.0.is_empty());
+    dock::layout(&mut root, &mut dock, &tabs, &mut close);
 
     if let Some((path, pose)) = &mut spawn.0 {
         let mut open = true;

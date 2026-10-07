@@ -9,7 +9,7 @@ mod robots;
 use bevy::prelude::*;
 use bevy_egui::{EguiGlobalSettings, EguiPrimaryContextPass};
 
-pub use camera::{MainCamera, scroll_notches};
+pub use camera::{MainCamera, cursor_in_viewport, scroll_notches};
 pub use map_texture::{MapSprite, MapTexture, map_rect, sync_map_texture};
 pub use robots::{Trails, sample_trails};
 

@@ -6,6 +6,8 @@ use bevy_egui::input::EguiWantsInput;
 use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
 use stdr_core::{KinematicKind, RobotId, Twist2D};
 
+use super::dock::{Dock, show_pane};
+use super::toolbar::toolbar;
 use crate::plot::PlotterSample;
 use crate::sim::{Selection, SimCommand, SimWorld};
 
@@ -81,7 +83,7 @@ impl Plugin for TeleopPlugin {
         app.init_resource::<TeleopState>()
             .init_resource::<EguiWantsInput>()
             .add_systems(Update, teleop_input.after(PlotterSample))
-            .add_systems(EguiPrimaryContextPass, teleop_window);
+            .add_systems(EguiPrimaryContextPass, teleop_pane.after(toolbar));
     }
 }
 
@@ -122,22 +124,24 @@ pub fn teleop_input(
     }
 }
 
-fn teleop_window(
+fn teleop_pane(
     mut ctx: EguiContexts,
+    dock: Res<Dock>,
     sel: Res<Selection>,
     mut st: ResMut<TeleopState>,
 ) -> Result {
-    let Some(id) = sel.robot else { return Ok(()) };
-    egui::Window::new("Teleop")
-        .default_pos([10.0, 500.0])
-        .show(ctx.ctx_mut()?, |ui| {
-            ui.label(format!("Driving: {id}"));
-            ui.separator();
-            ui.add(egui::Slider::new(&mut st.speeds.linear, 0.05..=3.0).text("Linear (m/s)"));
-            ui.add(egui::Slider::new(&mut st.speeds.angular, 0.1..=4.0).text("Angular (rad/s)"));
-            ui.separator();
-            ui.weak("W/S forward/back  A/D strafe (omni)  Q/E turn; arrows also work");
-        });
+    show_pane(ctx.ctx_mut()?, "teleop", dock.teleop, |ui| {
+        let Some(id) = sel.robot else {
+            ui.weak("Select a robot to drive it.");
+            return;
+        };
+        ui.label(format!("Driving: {id}"));
+        ui.separator();
+        ui.add(egui::Slider::new(&mut st.speeds.linear, 0.05..=3.0).text("Linear (m/s)"));
+        ui.add(egui::Slider::new(&mut st.speeds.angular, 0.1..=4.0).text("Angular (rad/s)"));
+        ui.separator();
+        ui.weak("W/S forward/back  A/D strafe (omni)  Q/E turn; arrows also work");
+    });
     Ok(())
 }
 
