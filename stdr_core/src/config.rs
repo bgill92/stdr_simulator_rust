@@ -72,7 +72,8 @@ impl TryFrom<String> for OdometryModel {
     }
 }
 
-/// Velocity-model noise coefficients: rows Ux, Uy, W, G; columns ux², uy², w².
+/// Velocity-model noise coefficients: rows Ux, Uy, W, G; columns ux², uy², w². Every entry is finite
+/// and non-negative (enforced at load).
 #[derive(Clone, Copy, PartialEq, Debug, Default, Deserialize)]
 #[serde(try_from = "AlphasYaml")]
 pub struct Alphas(pub [[f64; 3]; 4]);

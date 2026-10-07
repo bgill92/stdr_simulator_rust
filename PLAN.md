@@ -132,7 +132,7 @@ impl Alphas { pub fn variance(&self, row: AlphaRow, u: Twist2D) -> f64 }   // qu
 pub enum OdometryModel { #[default] Perfect, Velocity }
 pub struct KinematicConfig { pub kind: KinematicKind, pub odometry: OdometryModel, pub alphas: Alphas }
 ```
-`Alphas` deserialises via a private 12-field `AlphasYaml` (`a_ux_ux` …) and one `From` impl — the only place the
+`Alphas` deserialises via a private 12-field `AlphasYaml` (`a_ux_ux` …) and one `TryFrom` impl (rejects negative or non-finite alphas at load) — the only place the
 YAML names exist. `""` → Ideal (C++ parity); unknown strings rejected **at load** (C++ accepted at load, threw at spawn).
 Tests: `ApplyNoiseTest.*`, `OdometryVarianceTest.*`, `LoadRobotConfig.{SimpleRobotLoadsKinematic, KinematicOdometryModel*, InvalidOdometryModelReturnsError}`.
 
