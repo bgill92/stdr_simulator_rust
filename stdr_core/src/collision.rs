@@ -5,8 +5,9 @@ use crate::grid::{OccupancyGrid, Unknown};
 use crate::pose::{Pose2D, angle_diff};
 
 /// Whether moving `from` → `to` sweeps `footprint` through a blocked cell. Walks the cell path
-/// one cell at a time (always including `to`, so `from == to` checks a single pose), rotating
-/// the footprint by a shortest-arc theta lerp, and tests a 3×3 neighbourhood around every
+/// at unit steps `d = 0..=floor(path_dist)` from `from`'s cell (C++), so the final step lands on
+/// `to`'s cell only when the cell distance is integral; `from == to` checks the single pose.
+/// Rotates the footprint by a shortest-arc theta lerp and tests a 3×3 neighbourhood around every
 /// footprint-edge cell. Out of bounds and unknown cells collide.
 pub fn path_collides(
     grid: &OccupancyGrid,
