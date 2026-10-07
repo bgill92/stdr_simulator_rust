@@ -6,8 +6,8 @@ the design and milestone plan live in [PLAN.md](PLAN.md).
 
 ## Status
 
-- **M0 (done):** `stdr_core` crate with the workspace, `Pose`, footprint, `OccupancyGrid`,
-  map loading (YAML + PGM), and robot config loading (YAML with includes and noise files).
+- **M0 (done):** `stdr_core` crate with the workspace, `Pose2D`, `Footprint`, `OccupancyGrid`,
+  map loading (YAML + PNG/PGM), and robot config loading (YAML with includes and noise files).
 - **M1–M4 (not started):** core simulation (motion, collision, sensors, scheduler), Bevy app,
   plotters, 3D scene + camera sensor. See PLAN.md for details.
 
