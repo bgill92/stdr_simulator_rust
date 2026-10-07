@@ -177,6 +177,17 @@ mod WorldModelTest {
     }
 
     #[test]
+    fn SpawnOverridesConfigInitialPose() {
+        let mut e = engine();
+        let mut cfg = minimal_robot();
+        cfg.initial_pose = pose(9.0, 9.0, 9.0);
+        let id = e.spawn(cfg, pose(1.0, 2.0, 0.5));
+        let r = e.robot(id).unwrap();
+        assert_eq!(r.config.initial_pose, pose(1.0, 2.0, 0.5));
+        assert_eq!(r.config.initial_pose, r.initial_pose);
+    }
+
+    #[test]
     fn AddRobotInitializesOdomPoseToInitialPose() {
         let mut e = engine();
         let id = e.spawn(minimal_robot(), pose(1.0, 2.0, 0.5));

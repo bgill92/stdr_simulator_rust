@@ -145,7 +145,8 @@ impl SimulationEngine {
     }
 
     /// `pose` overrides `cfg.initial_pose` and becomes the reset pose.
-    pub fn spawn(&mut self, cfg: RobotConfig, pose: Pose2D) -> RobotId {
+    pub fn spawn(&mut self, mut cfg: RobotConfig, pose: Pose2D) -> RobotId {
+        cfg.initial_pose = pose;
         let mut scheduler = RateScheduler::new(self.step_dt).expect("engine step_dt is positive");
         for (i, s) in cfg.sensors.iter().enumerate() {
             scheduler.set_rate(i, s.common.frequency, self.mode);

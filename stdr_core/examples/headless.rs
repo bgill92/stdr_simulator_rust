@@ -19,6 +19,11 @@ use stdr_core::{
     Measurement, OdometryModel, Pose2D, SimulationEngine, Twist2D, load_map, load_robot_config,
 };
 
+/// Every `--key value` option; `--noise-off` is the only bare switch.
+const KNOWN_OPTIONS: [&str; 11] = [
+    "map", "robot", "x", "y", "theta", "ticks", "step-dt", "vx", "vy", "wz", "seed",
+];
+
 fn main() -> ExitCode {
     match run() {
         Ok(()) => ExitCode::SUCCESS,
@@ -34,9 +39,13 @@ fn run() -> Result<(), String> {
     let noise_off = args.iter().any(|a| a == "--noise-off");
     let mut opts = HashMap::new();
     let mut it = args.iter().filter(|a| *a != "--noise-off");
-    while let Some(key) = it.next() {
-        let value = it.next().ok_or(format!("{key} needs a value"))?;
-        opts.insert(key.trim_start_matches("--"), value.as_str());
+    while let Some(arg) = it.next() {
+        let key = arg
+            .strip_prefix("--")
+            .filter(|k| KNOWN_OPTIONS.contains(k))
+            .ok_or(format!("unknown argument '{arg}'"))?;
+        let value = it.next().ok_or(format!("{arg} needs a value"))?;
+        opts.insert(key, value.as_str());
     }
     let num = |key: &str, default: f64| -> Result<f64, String> {
         opts.get(key).map_or(Ok(default), |v| {
@@ -83,7 +92,11 @@ fn run() -> Result<(), String> {
         },
     );
 
-    for _ in 0..num("ticks", 1000.0)? as u64 {
+    let ticks: u64 = opts
+        .get("ticks")
+        .map_or(Ok(1000), |v| v.parse().map_err(|e| format!("--ticks: {e}")))?;
+
+    for _ in 0..ticks {
         engine.step();
         let r = engine.robot(id).expect("spawned above");
         let (p, o) = (r.state.pose, r.state.odom_pose);

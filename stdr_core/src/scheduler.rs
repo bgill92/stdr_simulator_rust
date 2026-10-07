@@ -38,8 +38,8 @@ impl FromStr for SchedulingMode {
     }
 }
 
-// ponytail: periods are derived from (freq_hz, step_dt) on demand instead of cached, so
-// `set_step_dt` has nothing to recompute.
+// Periods are derived from (freq_hz, step_dt) on demand instead of cached, so `set_step_dt`
+// has nothing to recompute.
 #[derive(Clone, Debug)]
 struct Entry {
     freq_hz: f64,
