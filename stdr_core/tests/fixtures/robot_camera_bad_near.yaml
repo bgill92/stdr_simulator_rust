@@ -1,0 +1,5 @@
+robot:
+  robot_specifications:
+    - camera:
+        camera_specifications:
+          near: 0

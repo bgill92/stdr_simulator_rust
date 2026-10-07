@@ -1,0 +1,12 @@
+camera:
+  camera_specifications:
+    width: 640
+    height: 480
+    fov: 1.5
+    near: 0.1
+    far: 20
+    frequency: 15
+    pose:
+      x: 0.1
+      y: 0.0
+      theta: 0.0

@@ -207,10 +207,59 @@ pub struct SonarSpec {
     pub cone_angle: f64,
 }
 
+/// A pinhole camera. Core only schedules it; the app renders the image (`simulate` returns `None`).
+#[derive(Clone, Copy, PartialEq, Debug, Deserialize)]
+#[serde(default)]
+pub struct CameraSpec {
+    /// Image size in pixels.
+    pub width: u32,
+    pub height: u32,
+    /// Horizontal field of view, radians.
+    pub fov: f64,
+    /// Clip planes, metres.
+    pub near: f64,
+    pub far: f64,
+}
+
+impl Default for CameraSpec {
+    fn default() -> Self {
+        Self {
+            width: 320,
+            height: 240,
+            fov: std::f64::consts::FRAC_PI_3,
+            near: 0.05,
+            far: 50.0,
+        }
+    }
+}
+
+impl CameraSpec {
+    /// The renderer panics on an empty image or a degenerate frustum, so these fail at load.
+    fn validate(self) -> Result<Self, String> {
+        if self.width == 0 || self.height == 0 {
+            return Err(format!(
+                "camera image must be non-empty, got {}x{}",
+                self.width, self.height
+            ));
+        }
+        if !(self.fov > 0.0 && self.fov < std::f64::consts::PI) {
+            return Err(format!("camera fov must be in (0, pi), got {}", self.fov));
+        }
+        if !(self.near > 0.0 && self.far > self.near && self.far.is_finite()) {
+            return Err(format!(
+                "camera clip planes need 0 < near < far, got near {} far {}",
+                self.near, self.far
+            ));
+        }
+        Ok(self)
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum SensorConfig {
     Laser(LaserSpec),
     Sonar(SonarSpec),
+    Camera(CameraSpec),
 }
 
 impl SensorConfig {
@@ -219,6 +268,7 @@ impl SensorConfig {
         match self {
             SensorConfig::Laser(_) => "laser",
             SensorConfig::Sonar(_) => "sonar",
+            SensorConfig::Camera(_) => "camera",
         }
     }
 }
@@ -232,12 +282,18 @@ pub struct Sensor {
 type SpecParser = fn(Value) -> Result<SensorConfig, serde_yaml_ng::Error>;
 
 /// The loader's only per-kind fan-out: a new sensor kind is one entry here plus its spec struct.
-const SENSOR_KINDS: [(&str, SpecParser); 2] = [
+const SENSOR_KINDS: [(&str, SpecParser); 3] = [
     ("laser", |v| {
         serde_yaml_ng::from_value(v).map(SensorConfig::Laser)
     }),
     ("sonar", |v| {
         serde_yaml_ng::from_value(v).map(SensorConfig::Sonar)
+    }),
+    ("camera", |v| {
+        serde_yaml_ng::from_value::<CameraSpec>(v)?
+            .validate()
+            .map(SensorConfig::Camera)
+            .map_err(serde::de::Error::custom)
     }),
 ];
 

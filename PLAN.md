@@ -6,7 +6,7 @@
 robots with ideal/omni kinematics, laser + sonar, odometry noise, a fixed-timestep sim loop, and a plotter
 plugin framework (`Plotter` base class, `REGISTER_PLOTTER`, `--plotter` CLI filter). This plan ports that
 standalone feature set to Rust on Bevy, keeps the same YAML inputs so both sims run the same maps/robots,
-and leaves a clean seam for a later 3D scene + camera sensor.
+and adds a 3D scene + camera sensor on top (M4).
 
 This is **not** a 1:1 port. An audit of the C++ found heavy duplication that a literal port would carry over:
 six-way per-sensor-kind fan-out in ~8 places, laser/sonar ray march byte-identical, the 2D rigid transform
@@ -37,7 +37,7 @@ Reference C++ (keep open while porting), all under `/home/bilal/Projects/robotic
 | UI | `bevy_egui` + `egui_plot`. Bevy renders map/robots/rays; egui for toolbar, robot info, teleop, plotter windows. |
 | Plotters | Compiled-in. Each plotter = state `Resource` + sample/render systems, registered via `inventory`. No plotter trait, no `SimView`, no `PlotSink`. `--plotter Name` filter kept. |
 | Config | C++ YAML schema unchanged. Loader = `serde_yaml_ng::Value` include-expansion + deep-merge, then serde-derive into `#[serde(default)]` structs. Fixes nested partial overrides and `noise: {filename:}` includes. |
-| 3D/camera | Separate milestone (M4). Core stays render-agnostic; camera becomes a `SensorConfig::Camera` variant later. |
+| 3D/camera | Separate milestone (M4, §M4). Core stays render-agnostic: `SensorConfig::Camera` is scheduled by core and rendered by the app. |
 | Threading | No sim thread. Single-threaded `FixedUpdate`. One tick is tens of µs; catch-up cap bounds worst case. Deterministic, lock-free, trivially headless-testable. |
 
 ## Workspace layout
@@ -59,7 +59,7 @@ stdr_simulator_rust/
     src/config/yaml.rs        # (private) resolve_includes, deep_merge, load_with_include<T>
     src/motion.rs             # integrate(kind, pose, vel, dt, pivot), perturb(cmd, &KinematicConfig, dt, rng), odometry_variance
     src/collision.rs          # path_collides(grid, footprint, from, to) -> bool
-    src/sensors.rs            # simulate(&Sensor, world_pose, &grid, rng) -> Measurement; private finish() (noise + REP-117)
+    src/sensors.rs            # simulate(&Sensor, world_pose, &grid, rng) -> Option<Measurement> (None: camera); private finish() (noise + REP-117)
     src/scheduler.rs          # RateScheduler keyed by sensor index (usize), SchedulingMode, private enum Schedule
     src/engine.rs             # SimulationEngine (owns map, robots, sim time, rng), RobotRuntime, RobotState, RobotId
     tests/                    # golden tests transcribed from C++ gtests (names kept)
@@ -76,12 +76,12 @@ stdr_simulator_rust/
                               # Trail<T>, Positioned, TeleportDetector, TimeSeries, SampleGate
     src/plot/overlay_plot.rs  # PlotCanvas (Canvas adapter over egui_plot::PlotUi), map_plot, draw_map
     src/plotters/{pose_error,map_trace,odometry_trace,scan_trace}.rs
-    src/scene3d/              # M4 only
+    src/scene3d/{mod,mesh,camera_sensor}.rs   # M4: extruded map/robots, orbit camera, camera sensors
     tests/headless.rs         # MinimalPlugins app tests
 ```
 
 Why two crates: the only split that pays is bevy-free vs bevy-dependent. `stdr_core` compiles in seconds, needs
-no GPU for `cargo test`, and is the thing M4 must not touch. Plotters stay inside `stdr_app` because `inventory`
+no GPU for `cargo test`, and stays bevy-free through M4 (the camera only adds plain data and scheduling). Plotters stay inside `stdr_app` because `inventory`
 entries in a separate rlib can be dropped by the linker (same problem as C++ `WHOLE_ARCHIVE`).
 
 `stdr_core` keeps C++ *test* names; types and modules are consolidated per §Core types. Engine owns map + robots.
@@ -143,7 +143,7 @@ Tests: `ApplyNoiseTest.*`, `OdometryVarianceTest.*`, `LoadRobotConfig.{SimpleRob
 pub struct SensorCommon { pub pose: Pose2D, pub frequency: f64, pub frame_id: String, pub noise_std: f64 }  // 0 = off
 pub struct LaserSpec { pub min_angle: f64, pub max_angle: f64, pub min_range: f64, pub max_range: f64, pub num_rays: i32 }
 pub struct SonarSpec { pub min_range: f64, pub max_range: f64, pub cone_angle: f64 }
-pub enum SensorConfig { Laser(LaserSpec), Sonar(SonarSpec) }        // Rfid/Co2/Thermal/Sound/Camera: future variants
+pub enum SensorConfig { Laser(LaserSpec), Sonar(SonarSpec), Camera(CameraSpec) }   // Rfid/Co2/Thermal/Sound: future variants
 pub struct Sensor { pub common: SensorCommon, pub kind: SensorConfig }
 pub struct LaserScan { angle_min, angle_max, angle_increment, range_min, range_max, ranges: Vec<f32> }
 pub struct SonarScan { pub range: f64 }
@@ -209,8 +209,7 @@ pub struct RobotRuntime {
     pub config: RobotConfig, pub initial_pose: Pose2D, pub state: RobotState,
     pub data: Vec<Option<Measurement>>,   // index = sensor index; None until first fire (e.g. no map). Stale data retained.
     pub collided: bool, scheduler: RateScheduler,
-    // No `fired` list: C++ `last_events` existed to feed the sensor rings, which are gone. Re-add `fired: Vec<usize>` in M4
-    // when the camera needs a "capture this frame" signal.
+    pub fired: Vec<usize>,   // M4: indices the last step fired, the app's "capture this frame" signal for cameras
 }
 impl RobotRuntime { pub fn sensor_index(&self, frame_id: &str) -> Option<usize>; pub fn sensor_world_pose(&self, i: usize) -> Pose2D }
 pub struct SimulationEngine { map: Option<OccupancyGrid>, map_revision: u64, robots: BTreeMap<RobotId, RobotRuntime>,
@@ -231,7 +230,7 @@ impl SimulationEngine {
 ```
 `step` iterates `robots.values_mut()` in place (no per-tick `RobotState` copies): `perturb → integrate(truth) /
 integrate(odom) → path_collides → commit (collision keeps truth, advances odom) → for i in scheduler.tick():
-data[i] = simulate(...)`; then `elapsed += step_dt; ticks += 1`. `elapsed` accumulates per step (not `ticks * step_dt`)
+fired.push(i); data[i] = simulate(...)` (camera → stays `None`); then `elapsed += step_dt; ticks += 1`. `elapsed` accumulates per step (not `ticks * step_dt`)
 so a `set_step_dt` mid-run keeps time continuous. Tests: `WorldModelTest.*` (robots/map), `SimulationEngineTest.*`
 (minus `RateSchedulerOdomFiresEveryTickAtMatchedRate`, `RateSchedulerTfClampedAtSimRate`: assertions already exist for sensor streams),
 `StandaloneBackend.{ResetRestoresSpawnPose*, TeleportResetsOdomPose, OdomPose*Model}` on `reset`/`teleport`,
@@ -448,16 +447,85 @@ EguiPass    render:    Res<P> -> PlotCanvas / egui_plot::{Line, PlotImage}
 - Toolbar (egui top panel): File → Load Map / Load Robot (`rfd` file dialog), Simulation → Start/Pause/Reset, Speed, Timestep; status bar with elapsed sim time + messages. Spawn dialog (x/y/theta) after Load Robot, prefilled from YAML `initial_pose`.
 - CLI `--x/--y/--theta` override YAML `initial_pose`; when absent, YAML is honoured (C++ ignored YAML: documented difference).
 
-## M4 seam: 3D scene + camera sensor (design now, build later)
+## M4: 3D scene + camera sensor
 
-- `scene3d::extrude_grid(&OccupancyGrid, height) -> Mesh` (occupied-cell columns; greedy row merge optional) and `extrude_footprint(&Footprint, height) -> Mesh`. Read existing core types only.
-- Scene root entity with `Quat::from_rotation_x(-FRAC_PI_2)` maps ROS Z-up to Bevy Y-up. Robot children keep `(x, y, 0, rot_z(theta))`, so `sync_robot_mirrors` serves both views unchanged.
-- Camera sensor: core's role is **scheduling only**. `SensorConfig::Camera(CameraSpec)` is parsed in `config.rs` as plain data
-  (additive); the scheduler fires it by sensor index like any sensor; `data[i]` stays `None` for cameras; `Measurement` never
-  holds a render type. Re-add `RobotRuntime.fired: Vec<usize>` in M4 so the app sees "capture this frame". The app owns
-  `CameraFrames: HashMap<(RobotId, usize), Handle<Image>>` (`Camera3d` child of the robot mirror, `RenderTarget::Image(handle)`),
-  GPU readback only if a plotter needs pixels. Core stays bevy-free.
-- `MapTexture` already provides the floor material.
+The 3D view is a second way to look at the same engine. It reads existing core types, adds no
+physics and keeps `stdr_core` bevy-free. The camera is the one new sensor kind: core schedules it,
+the app renders it.
+
+**Camera sensor (core).** The C++ STDR has no camera, so the yaml schema is new. It follows the
+other kinds: a `camera` entry with optional `filename` include and inline `camera_specifications`
+deep-merged on top.
+```yaml
+- camera:
+    camera_specifications:
+      pose: {x: 0.1, y: 0, theta: 0}   # mount pose in the body frame (SensorCommon)
+      frequency: 10                    # Hz, scheduled like any sensor (0 = every tick)
+      frame_id: front_camera           # default camera_{n}
+      width: 320                       # image pixels
+      height: 240
+      fov: 1.0472                      # horizontal field of view, rad, in (0, π)
+      near: 0.05                       # clip planes, m, 0 < near < far
+      far: 50.0
+```
+```rust
+pub struct CameraSpec { pub width: u32, pub height: u32, pub fov: f64, pub near: f64, pub far: f64 }  // Default 320×240, 60°, 0.05, 50
+pub enum SensorConfig { Laser(LaserSpec), Sonar(SonarSpec), Camera(CameraSpec) }
+pub fn simulate(..) -> Option<Measurement>;   // None for Camera: core never renders, Measurement holds no image
+pub struct RobotRuntime { .., pub fired: Vec<usize> }   // sensor indices the last step's scheduler fired
+```
+Invalid specs (zero size, fov outside (0, π), `near <= 0` or `far <= near`) are rejected at load:
+the renderer would panic on them. `fired` is cleared at the start of every `step` and by `reset`,
+and lists every fired index, map or no map. A camera's `data[i]` stays `None`. Every existing robot
+yaml loads unchanged; `stdr_resources/resources/robots/camera_robot.yaml` is the example.
+
+**Meshes** (`stdr_app/src/scene3d/mesh.rs`, pure functions, ROS frame: metres, Z up).
+```rust
+pub fn extrude_grid(g: &OccupancyGrid, height: f32) -> Mesh;     // occupied (> OCCUPANCY_THRESHOLD) cells
+pub fn extrude_footprint(f: &Footprint, height: f32) -> Mesh;
+```
+`extrude_grid` merges each row's run of occupied cells into one box (greedy row merge) and emits its
+top and four sides; there is no bottom face (the floor covers it). One quad = 4 vertices with a
+flat normal + 2 triangles, so a run costs 20 vertices / 30 indices. Unknown cells are not walls
+(sensor policy). `frieburg.png` has 16 578 occupied cells in 3 758 runs, about 75k vertices.
+`extrude_footprint` = side walls over `Footprint::vertices()` (a circle is the 360-point ring) plus
+an ear-clipped top cap, so concave footprints such as `random_shape_robot.yaml` cap correctly.
+
+**Scene** (`stdr_app/src/scene3d/mod.rs`, `Scene3dPlugin`).
+- `SceneRoot` entity with `Transform::from_rotation(Quat::from_rotation_x(-FRAC_PI_2))`: ROS
+  `(x, y, z)` → Bevy `(x, z, −y)`. Everything below it is in ROS coordinates.
+- Floor: a map-sized quad at z = 0 textured with `MapTexture.image` (unlit). Walls: one
+  `extrude_grid(grid, WALL_HEIGHT)` entity, rebuilt when `MapTexture` changes (i.e. on map revision).
+- `sync_robot_mirrors` (Update): diffs `engine.robots()` against `RobotEntities(HashMap<RobotId,
+  Entity>)`; spawns `(RobotMarker { id }, Mesh3d(extrude_footprint), ChildOf(root))`, sets
+  `Transform` to `(x, y, 0)` + `rot_z(theta)` every frame, despawns deleted robots (children too).
+  Mirrors and cameras exist in both view modes, so camera images keep updating in 2D.
+- `ViewMode { TwoD (default), ThreeD }` toggled from the toolbar. 2D: unchanged. 3D: the
+  orbit `Camera3d` (order −1) renders the scene; the 2D camera stays active only to host egui
+  (`PrimaryEguiContext`, clear colour `None`), the map sprite is hidden, and the gizmo overlay,
+  2D picking and 2D pan/zoom are off. Orbit camera: left-drag orbits, middle-drag pans, wheel
+  zooms, fitted to the map on load; pointer input gated on egui.
+
+**Camera rendering** (`stdr_app/src/scene3d/camera_sensor.rs`).
+- When a mirror spawns, each camera sensor gets a `Camera3d` child (`is_active: false`,
+  `RenderTarget::Image`) at `(x, y, CAMERA_Z)` looking along the sensor heading with ROS +Z up;
+  Bevy's vertical fov = `2·atan(tan(fov/2)·height/width)`. The app owns
+  `CameraFrames(HashMap<(RobotId, usize), Handle<Image>>)`; entries go away with the robot.
+- Capture: a FixedUpdate system after `sim_step` collects `fired` camera indices into
+  `PendingCaptures`; each Update a camera is active iff it is pending, then the set is cleared.
+  So a camera renders on frames where at least one of its ticks fired, and a paused sim keeps the
+  last picture.
+- A "Cameras" egui window shows every `CameraFrames` image (`EguiUserTextures`, no GPU readback).
+  No new plotter; readback waits until a plotter needs pixels.
+
+Tests: `scene3d::mesh` unit tests (one-cell grid: 20 vertices, 30 indices, bounds = the cell ×
+height; a row run merges to one box; two rows stay two boxes; unknown/free cells emit nothing;
+circle footprint side count and bounds; concave cap area = polygon area; normals unit-length and
+outward; Z-up→Y-up: a mesh vertex `(x, y, h)` under the root rotation lands at `(x, h, −y)`),
+`config::camera_*` (yaml parse with defaults and include, invalid specs rejected, `frame_id`
+default `camera_{n}`, every shipped robot loads unchanged), `engine::camera_fires_by_index_data_stays_none`,
+`engine::fired_lists_last_step_indices`, `engine::reset_clears_fired`, sensors `simulate` camera → `None`.
+Perf check: frame time with `frieburg.yaml` in the 3D view, numbers in the PR.
 
 ## Bug fixes vs kept quirks
 
@@ -538,7 +606,8 @@ Retired C++ tests (no counterpart by design): `PlotSink.*`, `PlotView.*`, `SpscR
 (inventory in the bin crate), `PlotPanel.{Budget*, Exception*}`.
 
 **M4 — 3D scene + camera sensor**
-Per seam above. Perf check on `frieburg.png`.
+Per §M4: `CameraSpec` + `fired` in core, `scene3d` (meshes, scene root, mirrors, orbit camera, 2D/3D toggle),
+camera sensors rendering to images shown in an egui window, `camera_robot.yaml`. Tests: the §M4 list. Perf check on `frieburg.png`.
 
 ## Crates (verify exact versions at `cargo init`)
 
