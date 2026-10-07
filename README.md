@@ -17,7 +17,9 @@ the design and milestone plan live in [PLAN.md](PLAN.md).
   and caps catch-up at 0.25 s of sim time per frame.
 - **M3 (done):** plotter windows over the map and sim time: Pose Error, Map Trace, Odometry
   Trace and Scan Trace, compiled in and selected with `--plotter`.
-- **M4 (not started):** 3D scene + camera sensor. See PLAN.md for details.
+- **M4 (done):** 3D view of the extruded map and robots (toolbar 2D/3D toggle; left-drag orbits,
+  middle-drag pans, wheel zooms) and a camera sensor: the core schedules it, the app renders each
+  camera into an image shown in the Cameras window.
 
 ## Build and test
 
@@ -57,6 +59,29 @@ app with `STDR_RESOURCES_DIR` set when loading the shipped robots. The app talks
 desktops run it through XWayland), so building it needs no system dev packages.
 
 CI runs `cargo fmt --check`, `cargo clippy`, and `cargo test` on pushes to `main` and on pull requests.
+
+## Camera sensor
+
+The original STDR has no camera, so its yaml schema is new to this port. It follows the other
+sensor kinds (optional `filename` include, inline `camera_specifications` merged on top):
+
+```yaml
+- camera:
+    camera_specifications:
+      pose: {x: 0.15, y: 0, theta: 0}   # mount pose in the robot frame
+      frequency: 10                     # Hz; 0 = every sim tick
+      frame_id: front_camera            # default camera_<n>
+      width: 320                        # image size in pixels
+      height: 240
+      fov: 1.0472                       # horizontal field of view, rad, in (0, pi)
+      near: 0.05                        # clip planes, m, 0 < near < far
+      far: 50
+```
+
+Omitted fields default to the values above (frame id `camera_<n>`, frequency 0). The lens sits
+just above the 0.2 m robot body; walls are 1 m tall. Cameras render only on frames where they
+fired, so a paused simulation keeps the last image. Try it with
+`--robot stdr_resources/resources/robots/camera_robot.yaml`.
 
 ## Test resources
 

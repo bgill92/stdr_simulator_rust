@@ -99,7 +99,7 @@ fn init_time(
     catch_up.apply(&mut virt);
 }
 
-fn sim_step(mut sim: ResMut<SimWorld>) {
+pub fn sim_step(mut sim: ResMut<SimWorld>) {
     sim.step();
 }
 

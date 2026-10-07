@@ -1,4 +1,4 @@
-//! Menu bar, Start/Pause/Reset control bar, status bar and the spawn dialog.
+//! Menu bar, Start/Pause/Reset control bar with the 2D/3D toggle, status bar and the spawn dialog.
 
 use std::path::PathBuf;
 
@@ -8,6 +8,7 @@ use stdr_core::{Pose2D, SimulationEngine};
 
 use super::messages::MessageLog;
 use crate::plot::{PlotterNames, ShowPlotter};
+use crate::scene3d::ViewMode;
 use crate::sim::{SimCommand, SimEvent, SimWorld, load_robot};
 
 pub const SPEEDS: [f64; 4] = [0.5, 1.0, 2.0, 5.0];
@@ -73,6 +74,7 @@ pub fn toolbar(
     log: Res<MessageLog>,
     mut spawn: ResMut<SpawnDialog>,
     plotters: Res<PlotterNames>,
+    mut view: ResMut<ViewMode>,
     mut cmd: MessageWriter<SimCommand>,
     mut events: MessageWriter<SimEvent>,
     mut show: MessageWriter<ShowPlotter>,
@@ -145,7 +147,12 @@ pub fn toolbar(
                         }
                     });
                 });
-                ui.horizontal(|ui| sim_buttons(ui, &mut cmd));
+                ui.horizontal(|ui| {
+                    sim_buttons(ui, &mut cmd);
+                    ui.separator();
+                    ui.selectable_value(&mut *view, ViewMode::TwoD, "2D");
+                    ui.selectable_value(&mut *view, ViewMode::ThreeD, "3D");
+                });
             });
         });
 

@@ -522,9 +522,9 @@ Tests: `scene3d::mesh` unit tests (one-cell grid: 20 vertices, 30 indices, bound
 height; a row run merges to one box; two rows stay two boxes; unknown/free cells emit nothing;
 circle footprint side count and bounds; concave cap area = polygon area; normals unit-length and
 outward; Z-up→Y-up: a mesh vertex `(x, y, h)` under the root rotation lands at `(x, h, −y)`),
-`config::camera_*` (yaml parse with defaults and include, invalid specs rejected, `frame_id`
-default `camera_{n}`, every shipped robot loads unchanged), `engine::camera_fires_by_index_data_stays_none`,
-`engine::fired_lists_last_step_indices`, `engine::reset_clears_fired`, sensors `simulate` camera → `None`.
+`config::{camera_parsed_with_include_and_defaults, invalid_camera_rejected_at_load,
+shipped_camera_robot_loads, every_shipped_robot_loads}`, `engine::camera_fires_by_index_data_stays_none`,
+`engine::fired_lists_last_step_indices_without_map`, `engine::reset_clears_fired`, sensors `simulate` camera → `None`.
 Perf check: frame time with `frieburg.yaml` in the 3D view, numbers in the PR.
 
 ## Bug fixes vs kept quirks
@@ -639,6 +639,10 @@ camera sensors rendering to images shown in an egui window, `camera_robot.yaml`.
 - `inventory`: entries must be `'static` fn items, plotters inside the bin crate.
 - bevy_egui: UI systems only in its context-pass schedule; gate world input on `wants_pointer_input()` / `wants_keyboard_input()`; share textures via `EguiUserTextures`.
 - Robot mirrors keyed by `RobotId`; diff `engine.robots()` vs `RobotEntities` each frame; never store `Entity` in core.
+- bevy_egui's auto primary context goes to whichever new camera it sees first, which can be a 3D camera: the
+  2D camera carries `PrimaryEguiContext` explicitly and auto-creation is off.
+- A `Screenshot` of an image render target only captures on frames a camera renders it; sensor cameras render
+  only on fired frames, so offscreen checks must screenshot on such a frame (the texture itself persists).
 
 ## Glossary
 
