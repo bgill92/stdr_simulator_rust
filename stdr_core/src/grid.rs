@@ -84,6 +84,14 @@ impl OccupancyGrid {
         )
     }
 
+    /// Continuous cell coordinates, the origin of sensor rays.
+    pub fn grid_coords(&self, x: f64, y: f64) -> (f64, f64) {
+        (
+            (x - self.origin.x) / self.resolution,
+            (y - self.origin.y) / self.resolution,
+        )
+    }
+
     pub fn in_bounds(&self, (cx, cy): (i32, i32)) -> bool {
         u32::try_from(cx).is_ok_and(|x| x < self.width)
             && u32::try_from(cy).is_ok_and(|y| y < self.height)
@@ -102,5 +110,31 @@ impl OccupancyGrid {
             Some(v) if v < 0 => unknown == Unknown::Solid,
             Some(v) => v > OCCUPANCY_THRESHOLD,
         }
+    }
+
+    /// Marches `origin` (cell coords, see `grid_coords`) along `angle` one cell length per step,
+    /// `1..=max_steps`. `Some(step)` at the first blocked cell; `None` if the ray leaves the map
+    /// or never hits. Cells truncate `as i32` (C++ parity).
+    pub fn raycast(
+        &self,
+        (ox, oy): (f64, f64),
+        angle: f64,
+        max_steps: i32,
+        unknown: Unknown,
+    ) -> Option<i32> {
+        let (s, c) = angle.sin_cos();
+        for step in 1..=max_steps {
+            let cell = (
+                (ox + c * f64::from(step)) as i32,
+                (oy + s * f64::from(step)) as i32,
+            );
+            if !self.in_bounds(cell) {
+                return None;
+            }
+            if self.is_blocked(cell, unknown) {
+                return Some(step);
+            }
+        }
+        None
     }
 }
