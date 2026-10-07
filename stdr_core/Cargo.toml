@@ -6,6 +6,8 @@ license.workspace = true
 
 [dependencies]
 image = { version = "0.25.10", default-features = false, features = ["png", "pnm"] }
+rand = "0.10.3"
+rand_distr = "0.6.0"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_yaml_ng = "0.10.0"
 thiserror = "2.0.21"

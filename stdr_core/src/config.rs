@@ -12,7 +12,7 @@ use serde_yaml_ng::Value;
 
 use crate::error::CoreError;
 use crate::footprint::Footprint;
-use crate::pose::{Point2D, Pose2D};
+use crate::pose::{Point2D, Pose2D, Twist2D};
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct RobotConfig {
@@ -76,6 +76,26 @@ impl TryFrom<String> for OdometryModel {
 #[derive(Clone, Copy, PartialEq, Debug, Default, Deserialize)]
 #[serde(from = "AlphasYaml")]
 pub struct Alphas(pub [[f64; 3]; 4]);
+
+/// Row selector for `Alphas::variance`.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[repr(usize)]
+pub enum AlphaRow {
+    Ux,
+    Uy,
+    W,
+    G,
+}
+
+impl Alphas {
+    /// `a[row] · (ux², uy², w²)`: the variance rate of one noise channel for command `u`.
+    pub fn variance(&self, row: AlphaRow, u: Twist2D) -> f64 {
+        let [a_ux, a_uy, a_w] = self.0[row as usize];
+        a_ux * u.linear_x * u.linear_x
+            + a_uy * u.linear_y * u.linear_y
+            + a_w * u.angular_z * u.angular_z
+    }
+}
 
 /// The only place the yaml alpha names exist.
 #[derive(Deserialize, Default)]
