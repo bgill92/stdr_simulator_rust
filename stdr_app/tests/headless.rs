@@ -9,7 +9,7 @@ use bevy::time::TimeUpdateStrategy;
 use stdr_app::sim::{Selection, SimCommand, SimEvent, SimPlugin, SimWorld};
 use stdr_app::ui::teleop::{TeleopPlugin, TeleopState};
 use stdr_app::ui::toolbar::status_text;
-use stdr_app::view2d::{MapTexture, sync_map_texture};
+use stdr_app::view2d::{MapTexture, Trails, sample_trails, sync_map_texture};
 use stdr_core::{
     LaserSpec, OccupancyGrid, Pose2D, RobotConfig, RobotId, Sensor, SensorCommon, SensorConfig,
     SimulationEngine, Twist2D,
@@ -278,6 +278,48 @@ fn reset_restores_spawn_state() {
         app.update();
     }
     check(&app);
+}
+
+#[test]
+fn driving_grows_trail_and_reset_or_teleport_clears_it() {
+    let mut app = app();
+    app.init_resource::<Trails>().add_systems(
+        PreUpdate,
+        sample_trails.after(stdr_app::sim::apply_sim_commands),
+    );
+    let spawn = Pose2D::default();
+    let id = {
+        let mut s = sim_mut(&mut app);
+        let id = s.spawn(RobotConfig::default(), spawn);
+        s.set_cmd_vel(
+            id,
+            Twist2D {
+                linear_x: 1.0,
+                ..Default::default()
+            },
+        );
+        id
+    };
+    let trail = |app: &App| app.world().resource::<Trails>().0[&id].xy().to_vec();
+    send(&mut app, SimCommand::Start);
+    for _ in 0..5 {
+        app.update();
+    }
+    assert!(trail(&app).len() >= 3);
+
+    let far = Pose2D {
+        x: 5.0,
+        y: 5.0,
+        theta: 0.0,
+    };
+    send(&mut app, SimCommand::Pause);
+    send(&mut app, SimCommand::Teleport { id, pose: far });
+    app.update();
+    assert_eq!(trail(&app), [[5.0, 5.0]]);
+
+    send(&mut app, SimCommand::Reset);
+    app.update();
+    assert_eq!(trail(&app), [[spawn.x, spawn.y]]);
 }
 
 #[test]

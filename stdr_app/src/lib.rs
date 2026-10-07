@@ -3,6 +3,7 @@
 
 pub mod cli;
 pub mod overlay;
+pub mod plot;
 pub mod sim;
 pub mod ui;
 pub mod view2d;

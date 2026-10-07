@@ -1,4 +1,4 @@
-use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll, MouseScrollUnit};
+use bevy::input::mouse::{AccumulatedMouseScroll, MouseScrollUnit};
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_egui::input::EguiWantsInput;
@@ -59,26 +59,31 @@ pub fn fit_needed(tex: Res<MapTexture>, lock: Res<ViewLock>) -> bool {
     tex.is_changed() || lock.0
 }
 
-/// Middle-drag pans; the wheel zooms about the cursor.
+/// Middle-drag keeps the world point grabbed under the cursor; the wheel zooms about the cursor.
 pub fn camera_pan_zoom(
     lock: Res<ViewLock>,
     egui_input: Res<EguiWantsInput>,
     buttons: Res<ButtonInput<MouseButton>>,
-    motion: Res<AccumulatedMouseMotion>,
     scroll: Res<AccumulatedMouseScroll>,
     window: Single<&Window, With<PrimaryWindow>>,
     cam: Single<(&Camera, &GlobalTransform, &mut Transform, &mut Projection), With<MainCamera>>,
+    mut grab: Local<Option<Vec2>>,
 ) {
     if lock.0 || egui_input.wants_pointer_input() {
+        *grab = None;
         return;
     }
     let (camera, at, mut t, mut proj) = cam.into_inner();
     let Projection::Orthographic(o) = &mut *proj else {
         return;
     };
-    if buttons.pressed(MouseButton::Middle) {
-        // Screen y points down, world y up.
-        t.translation += Vec3::new(-motion.delta.x, motion.delta.y, 0.0) * o.scale;
+    let mut cursor = cursor_world(&window, camera, at);
+    if !buttons.pressed(MouseButton::Middle) {
+        *grab = None;
+    } else if let Some(p) = cursor {
+        let g = *grab.get_or_insert(p);
+        t.translation += (g - p).extend(0.0);
+        cursor = Some(g);
     }
     let notches = match scroll.unit {
         MouseScrollUnit::Line => scroll.delta.y,
@@ -88,7 +93,7 @@ pub fn camera_pan_zoom(
         let factor = ZOOM_STEP.powf(-notches);
         o.scale *= factor;
         // Keep the world point under the cursor fixed: c' = p - (p - c) * factor.
-        if let Some(p) = cursor_world(&window, camera, at) {
+        if let Some(p) = cursor {
             let c = t.translation.truncate();
             t.translation = (p - (p - c) * factor).extend(t.translation.z);
         }

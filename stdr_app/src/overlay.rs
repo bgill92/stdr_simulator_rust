@@ -31,6 +31,10 @@ pub const HEADING: Style = Style {
     color: [255, 0, 0, 255],
     width: 2.5,
 };
+pub const TRAIL: Style = Style {
+    color: [0, 120, 255, 200],
+    width: 1.5,
+};
 pub const LASER_RAY: Style = Style {
     color: [255, 50, 50, 80],
     width: 1.0,

@@ -1,8 +1,21 @@
+use std::collections::HashMap;
+
 use bevy::prelude::*;
+use stdr_core::{Pose2D, RobotId};
 
 use super::camera::{MainCamera, world_per_pixel};
 use crate::overlay::{self, Canvas, Style};
-use crate::sim::{Selection, SensorVisibility, SimWorld};
+use crate::plot::Trail;
+use crate::sim::{Selection, SensorVisibility, SimCommand, SimWorld};
+
+/// Truth-pose samples kept per robot.
+const TRAIL_CAP: usize = 2000;
+/// Metres the robot must move before the next sample.
+const TRAIL_SPACING: f64 = 0.05;
+
+/// Each robot's truth-pose path on the map.
+#[derive(Resource, Default)]
+pub struct Trails(pub HashMap<RobotId, Trail<Pose2D>>);
 
 /// `Canvas` over Bevy gizmos: the only place overlay f64 world coordinates become `Vec2`.
 /// Gizmo line width is global, so `Style::width` is ignored here.
@@ -36,9 +49,36 @@ impl Canvas for GizmoCanvas<'_, '_, '_> {
     }
 }
 
+/// After `apply_sim_commands`: a reset or teleport starts a fresh trail so no line joins the
+/// old and new poses; deleted robots lose theirs.
+pub fn sample_trails(
+    mut commands: MessageReader<SimCommand>,
+    sim: Res<SimWorld>,
+    mut trails: ResMut<Trails>,
+) {
+    for c in commands.read() {
+        match c {
+            SimCommand::Reset => trails.0.clear(),
+            SimCommand::Teleport { id, .. } => {
+                trails.0.remove(id);
+            }
+            _ => {}
+        }
+    }
+    trails.0.retain(|id, _| sim.robot(*id).is_some());
+    for (id, r) in sim.robots() {
+        trails
+            .0
+            .entry(id)
+            .or_insert_with(|| Trail::new(TRAIL_CAP, TRAIL_SPACING))
+            .push_if_moved(r.state.pose);
+    }
+}
+
 pub fn draw_overlay(
     mut gizmos: Gizmos,
     sim: Res<SimWorld>,
+    trails: Res<Trails>,
     sel: Res<Selection>,
     vis: Res<SensorVisibility>,
     proj: Single<&Projection, With<MainCamera>>,
@@ -48,6 +88,9 @@ pub fn draw_overlay(
         world_per_px: world_per_pixel(&proj),
     };
     for (id, r) in sim.robots() {
+        if let Some(trail) = trails.0.get(&id) {
+            overlay::draw_trail(&mut c, trail.xy(), overlay::TRAIL);
+        }
         overlay::draw_sensors(&mut c, r, |i| vis.0.contains(&(id, i)));
         overlay::draw_robot(&mut c, r, sel.robot == Some(id));
     }
