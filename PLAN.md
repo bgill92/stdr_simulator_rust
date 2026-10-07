@@ -69,7 +69,7 @@ stdr_simulator_rust/
     src/lib.rs                # the plugins as a library, so tests/headless.rs can drive them
     src/cli.rs                # clap: --map --robot --x --y --theta
     src/sim/{mod,commands}.rs # SimPlugin + resources + sim_step; SimCommand/SimEvent + apply_sim_commands
-    src/view2d/{map_texture,robots,camera,picking}.rs   # robots.rs = GizmoCanvas + per-frame draw_robot/draw_sensors calls
+    src/view2d/{map_texture,robots,camera,picking}.rs   # robots.rs = GizmoCanvas + per-frame draw_robot/draw_sensors/draw_trail calls
     src/ui/{toolbar,robot_info,messages,teleop}.rs      # teleop.rs = teleop_twist(keys, KinematicKind, speeds) pure fn + unit tests
     src/overlay.rs            # trait Canvas, Style, draw_robot, draw_sensors, draw_trail, geometry helpers (no bevy/egui types)
     src/plot/mod.rs           # PlotterCtl<P>, add_plotter, plotter_window, PlotterEntry registry,

@@ -11,7 +11,7 @@ the design and milestone plan live in [PLAN.md](PLAN.md).
 - **M1 (done):** core simulation in `stdr_core`: kinematics and odometry noise, swept-footprint
   collision, laser and sonar, per-sensor rate scheduling, and `SimulationEngine` (robots, map,
   sim time, one seedable RNG), plus the `headless` example.
-- **M2 (done):** `stdr_app`, the Bevy app: 2D map view with pan/zoom, robot and sensor overlay,
+- **M2 (done):** `stdr_app`, the Bevy app: 2D map view with pan/zoom, robot, sensor and trail overlay,
   click-to-select, right-click teleport/delete, WASD/QE keyboard teleop, and egui toolbar,
   robot info and message panels. The simulation runs in Bevy's fixed timestep, starts paused,
   and caps catch-up at 0.25 s of sim time per frame.
