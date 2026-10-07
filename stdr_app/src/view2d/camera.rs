@@ -27,8 +27,10 @@ const OVERLAY_LAYER: usize = 1;
 /// Also hosts egui, explicitly: in the 3D view it stays active (clearing nothing) so the panels
 /// keep drawing over the 3D camera.
 pub fn spawn_camera(mut commands: Commands, mut gizmos: ResMut<GizmoConfigStore>) {
-    gizmos.config_mut::<DefaultGizmoConfigGroup>().0.render_layers =
-        RenderLayers::layer(OVERLAY_LAYER);
+    gizmos
+        .config_mut::<DefaultGizmoConfigGroup>()
+        .0
+        .render_layers = RenderLayers::layer(OVERLAY_LAYER);
     commands.spawn((
         Camera2d,
         MainCamera,
