@@ -62,18 +62,23 @@ pub fn active_tab(tabs: &[&'static str], current: Option<&str>) -> Option<&'stat
 }
 
 /// The Map pane as a camera viewport: logical rect × `scale` to physical pixels, clamped to the
-/// window. None while the pane is empty.
+/// window and kept at least 1×1 so a collapsed pane never falls back to the full window. None
+/// only while the window itself is empty.
 pub fn map_viewport(rect: egui::Rect, scale: f32, window: UVec2) -> Option<Viewport> {
+    if window.x == 0 || window.y == 0 {
+        return None;
+    }
+    let win = window.as_vec2();
     let min = (Vec2::new(rect.min.x, rect.min.y) * scale)
         .round()
-        .max(Vec2::ZERO);
+        .clamp(Vec2::ZERO, win - Vec2::ONE);
     let max = (Vec2::new(rect.max.x, rect.max.y) * scale)
         .round()
-        .min(window.as_vec2());
-    let size = (max - min).max(Vec2::ZERO).as_uvec2();
-    (size.x > 0 && size.y > 0).then(|| Viewport {
+        .min(win)
+        .max(min + Vec2::ONE);
+    Some(Viewport {
         physical_position: min.as_uvec2(),
-        physical_size: size,
+        physical_size: (max - min).as_uvec2(),
         ..default()
     })
 }
@@ -213,6 +218,13 @@ mod tests {
         assert_eq!(vp.physical_position, UVec2::new(0, 100));
         assert_eq!(vp.physical_size, UVec2::new(700, 500));
         let empty = egui::Rect::from_min_max(egui::pos2(10.0, 10.0), egui::pos2(10.0, 90.0));
-        assert!(map_viewport(empty, 1.0, UVec2::new(100, 100)).is_none());
+        let vp = map_viewport(empty, 1.0, UVec2::new(100, 100)).unwrap();
+        assert_eq!(vp.physical_position, UVec2::new(10, 10));
+        assert_eq!(vp.physical_size, UVec2::new(1, 80));
+        let inverted = egui::Rect::from_min_max(egui::pos2(20.0, 150.0), egui::pos2(60.0, 40.0));
+        let vp = map_viewport(inverted, 1.0, UVec2::new(100, 100)).unwrap();
+        assert_eq!(vp.physical_position, UVec2::new(20, 99));
+        assert_eq!(vp.physical_size, UVec2::new(40, 1));
+        assert!(map_viewport(rect, 1.0, UVec2::ZERO).is_none());
     }
 }

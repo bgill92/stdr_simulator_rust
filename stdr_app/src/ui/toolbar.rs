@@ -113,6 +113,7 @@ pub fn toolbar(
         egui::Id::new("dock_root"),
         egui::UiBuilder::new().max_rect(ctx.content_rect()),
     );
+    let mut shown = None;
     egui::Panel::top("toolbar").show(&mut root, |ui| {
         egui::MenuBar::new().ui(ui, |ui| {
             ui.menu_button("File", |ui| {
@@ -166,6 +167,7 @@ pub fn toolbar(
                     if ui.button(name).clicked() {
                         show.write(ShowPlotter(name));
                         dock.active_tab = Some(name);
+                        shown = Some(name);
                         ui.close();
                     }
                 }
@@ -179,7 +181,11 @@ pub fn toolbar(
         });
     });
     egui::Panel::bottom("status_bar").show(&mut root, |ui| status_bar(ui, &virt, &sim, &log));
-    let tabs = dock::plot_tabs(&plotters.0, |n| open.0.contains(n), !frames.0.is_empty());
+    let tabs = dock::plot_tabs(
+        &plotters.0,
+        |n| open.0.contains(n) || shown == Some(n),
+        !frames.0.is_empty(),
+    );
     dock::layout(&mut root, &mut dock, &tabs, &mut close);
 
     if let Some((path, pose)) = &mut spawn.0 {
