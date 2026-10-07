@@ -7,9 +7,11 @@ license.workspace = true
 [dependencies]
 stdr_core = { path = "../stdr_core" }
 # Default features minus audio (ALSA), gamepads (libudev) and native Wayland (libwayland-dev; XWayland
-# covers it), so the build needs no system dev packages. ui/3d/scene/picking are unused in 2D.
+# covers it), so the build needs no system dev packages. ui/scene/picking/gltf are unused;
+# bevy_pbr is the 3D view and camera sensors.
 bevy = { version = "0.19.1", default-features = false, features = [
     "2d_bevy_render",
+    "bevy_pbr",
     "default_app",
     "std",
     "multi_threaded",

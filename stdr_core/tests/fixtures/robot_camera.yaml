@@ -1,0 +1,16 @@
+robot:
+  robot_specifications:
+    - footprint:
+        footprint_specifications:
+          radius: 0.2
+    - camera:
+        filename: camera_sensors/test_camera.yaml
+        camera_specifications:
+          height: 360
+          pose:
+            theta: 0.5
+    - camera:
+        camera_specifications:
+          frame_id: rear
+    - camera:
+        camera_specifications: {}

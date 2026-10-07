@@ -8,8 +8,8 @@ use rand::SeedableRng;
 use rand::rngs::StdRng;
 use std::f64::consts::PI;
 use stdr_core::{
-    LaserScan, LaserSpec, OccupancyGrid, Pose2D, Sensor, SensorCommon, SensorConfig, SonarSpec,
-    simulate,
+    CameraSpec, LaserScan, LaserSpec, OccupancyGrid, Pose2D, Sensor, SensorCommon, SensorConfig,
+    SonarSpec, simulate,
 };
 
 /// 10×10 at 0.1 m; `walled` marks rows/cols 0 and 9 occupied.
@@ -69,6 +69,7 @@ fn sonar(min_range: f64, max_range: f64, cone_angle: f64) -> SensorConfig {
 
 fn scan(s: &Sensor, at: Pose2D, g: &OccupancyGrid) -> LaserScan {
     simulate(s, at, g, &mut StdRng::seed_from_u64(1))
+        .unwrap()
         .as_laser()
         .unwrap()
         .clone()
@@ -76,6 +77,7 @@ fn scan(s: &Sensor, at: Pose2D, g: &OccupancyGrid) -> LaserScan {
 
 fn sonar_range(s: &Sensor, at: Pose2D, g: &OccupancyGrid) -> f64 {
     simulate(s, at, g, &mut StdRng::seed_from_u64(1))
+        .unwrap()
         .as_sonar()
         .unwrap()
         .range
@@ -204,5 +206,15 @@ mod sensors {
         };
         assert_abs_diff_eq!(probe((300, 241)), 2.0, epsilon = 1e-12);
         assert_eq!(probe((300, 259)), f64::INFINITY);
+    }
+
+    /// Core schedules cameras but never renders them.
+    #[test]
+    fn camera_yields_no_measurement() {
+        let cam = sensor(SensorConfig::Camera(CameraSpec::default()), 0.0);
+        assert_eq!(
+            simulate(&cam, CENTRE, &grid(true), &mut StdRng::seed_from_u64(1)),
+            None
+        );
     }
 }

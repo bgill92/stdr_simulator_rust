@@ -8,8 +8,8 @@ use approx::assert_abs_diff_eq;
 use std::f64::consts::PI;
 use std::path::Path;
 use stdr_core::{
-    Footprint, KinematicConfig, KinematicKind, LaserSpec, OccupancyGrid, OdometryModel, Point2D,
-    Pose2D, RobotConfig, RobotId, SchedulingMode, Sensor, SensorCommon, SensorConfig,
+    CameraSpec, Footprint, KinematicConfig, KinematicKind, LaserSpec, OccupancyGrid, OdometryModel,
+    Point2D, Pose2D, RobotConfig, RobotId, SchedulingMode, Sensor, SensorCommon, SensorConfig,
     SimulationEngine, Twist2D, integrate, load_robot_config,
 };
 
@@ -618,5 +618,55 @@ mod engine {
         }
         e.reset();
         assert_eq!((e.sim_time(), e.ticks()), (0.0, 0));
+    }
+
+    /// Laser (index 0) every tick, camera (index 1) every second tick at `step_dt` 0.1.
+    fn laser_and_camera() -> RobotConfig {
+        let mut cfg = robot_with_laser();
+        cfg.sensors.push(Sensor {
+            common: SensorCommon {
+                frequency: 5.0,
+                ..SensorCommon::default()
+            },
+            kind: SensorConfig::Camera(CameraSpec::default()),
+        });
+        cfg
+    }
+
+    #[test]
+    fn camera_fires_by_index_data_stays_none() {
+        let mut e = engine();
+        e.set_map(free_map());
+        let id = e.spawn(laser_and_camera(), pose(1.0, 1.0, 0.0));
+        let mut fired = Vec::new();
+        for _ in 0..4 {
+            e.step();
+            let r = e.robot(id).unwrap();
+            fired.push(r.fired.clone());
+            assert!(r.data[0].is_some());
+            assert_eq!(r.data[1], None);
+        }
+        assert_eq!(fired, [vec![0], vec![0, 1], vec![0], vec![0, 1]]);
+    }
+
+    #[test]
+    fn fired_lists_last_step_indices_without_map() {
+        let mut e = engine();
+        let id = e.spawn(laser_and_camera(), Pose2D::default());
+        assert!(e.robot(id).unwrap().fired.is_empty());
+        e.step();
+        e.step();
+        let r = e.robot(id).unwrap();
+        assert_eq!(r.fired, [0, 1]);
+        assert_eq!(r.data, [None, None]);
+    }
+
+    #[test]
+    fn reset_clears_fired() {
+        let mut e = engine();
+        let id = e.spawn(laser_and_camera(), Pose2D::default());
+        e.step();
+        e.reset();
+        assert!(e.robot(id).unwrap().fired.is_empty());
     }
 }

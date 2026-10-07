@@ -4,8 +4,8 @@
 use std::path::{Path, PathBuf};
 
 use stdr_core::{
-    Footprint, KinematicKind, OdometryModel, Point2D, Pose2D, RobotConfig, SensorConfig,
-    load_robot_config,
+    CameraSpec, Footprint, KinematicKind, OdometryModel, Point2D, Pose2D, RobotConfig,
+    SensorConfig, load_robot_config,
 };
 
 fn fixtures() -> PathBuf {
@@ -372,7 +372,7 @@ mod config {
             .filter(|p| p.extension().is_some_and(|e| e == "yaml"))
             .collect();
         yamls.sort();
-        assert_eq!(yamls.len(), 13);
+        assert_eq!(yamls.len(), 14);
         for yaml in &yamls {
             let name = yaml.file_name().unwrap().to_str().unwrap();
             let (cfg, warnings) = load_shipped(name);
@@ -428,5 +428,70 @@ mod config {
     fn missing_footprint_is_zero_radius_circle() {
         let (cfg, _) = load_shipped("too_simple_robot.yaml");
         assert_eq!(cfg.footprint, Footprint::Circle { radius: 0.0 });
+    }
+
+    fn camera(cfg: &RobotConfig, i: usize) -> CameraSpec {
+        match cfg.sensors[i].kind {
+            SensorConfig::Camera(c) => c,
+            other => panic!("sensor {i} is {other:?}"),
+        }
+    }
+
+    #[test]
+    fn camera_parsed_with_include_and_defaults() {
+        let cfg = load("robot_camera.yaml");
+        // File values, inline height and pose.theta merged on top.
+        assert_eq!(
+            camera(&cfg, 0),
+            CameraSpec {
+                width: 640,
+                height: 360,
+                fov: 1.5,
+                near: 0.1,
+                far: 20.0,
+            }
+        );
+        let common = &cfg.sensors[0].common;
+        assert_eq!(common.frequency, 15.0);
+        assert_eq!(
+            common.pose,
+            Pose2D {
+                x: 0.1,
+                y: 0.0,
+                theta: 0.5
+            }
+        );
+        assert_eq!(camera(&cfg, 2), CameraSpec::default());
+        let ids: Vec<_> = cfg
+            .sensors
+            .iter()
+            .map(|s| s.common.frame_id.as_str())
+            .collect();
+        assert_eq!(ids, ["camera_0", "rear", "camera_2"]);
+    }
+
+    #[test]
+    fn invalid_camera_rejected_at_load() {
+        for (field, needle) in [
+            ("width", "non-empty"),
+            ("fov", "fov"),
+            ("near", "near"),
+            ("far", "far"),
+        ] {
+            let name = format!("robot_camera_bad_{field}.yaml");
+            let err = load_err(&name);
+            assert!(err.contains(&name) && err.contains(needle), "{err}");
+        }
+    }
+
+    #[test]
+    fn shipped_camera_robot_loads() {
+        let (cfg, warnings) = load_shipped("camera_robot.yaml");
+        assert!(warnings.is_empty(), "{warnings:?}");
+        let kinds: Vec<_> = cfg.sensors.iter().map(|s| s.kind.name()).collect();
+        assert_eq!(kinds, ["laser", "camera"]);
+        assert_eq!(cfg.sensors[1].common.frame_id, "front_camera");
+        assert_eq!(cfg.sensors[1].common.frequency, 10.0);
+        assert_eq!(camera(&cfg, 1).width, 320);
     }
 }

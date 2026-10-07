@@ -48,17 +48,18 @@ impl Measurement {
     }
 }
 
-/// One reading of `sensor` mounted at `world_pose`.
+/// One reading of `sensor` mounted at `world_pose`; `None` for a camera, whose image the app
+/// renders (core holds no render types).
 pub fn simulate(
     sensor: &Sensor,
     world_pose: Pose2D,
     grid: &OccupancyGrid,
     rng: &mut (impl Rng + ?Sized),
-) -> Measurement {
+) -> Option<Measurement> {
     let res = grid.resolution();
     let origin = grid.grid_coords(world_pose.x, world_pose.y);
     let noise_std = sensor.common.noise_std;
-    match sensor.kind {
+    Some(match sensor.kind {
         SensorConfig::Laser(spec) => {
             let increment = if spec.num_rays > 1 {
                 (spec.max_angle - spec.min_angle) / f64::from(spec.num_rays - 1)
@@ -103,7 +104,8 @@ pub fn simulate(
                 range: finish(hit, res, spec.min_range, spec.max_range, noise_std, rng),
             })
         }
-    }
+        SensorConfig::Camera(_) => return None,
+    })
 }
 
 /// Raycast steps → REP-117 range. No hit stays +Inf untouched by noise (no physical return);

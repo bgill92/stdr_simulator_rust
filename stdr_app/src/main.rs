@@ -5,6 +5,7 @@ use bevy_egui::EguiPlugin;
 use clap::Parser;
 use stdr_app::cli::Cli;
 use stdr_app::plot::add_plotters;
+use stdr_app::scene3d::Scene3dPlugin;
 use stdr_app::sim::{SimEvent, SimPlugin, SimWorld, load_robot};
 use stdr_app::ui::UiPlugin;
 use stdr_app::view2d::View2dPlugin;
@@ -55,6 +56,7 @@ fn main() -> ExitCode {
         EguiPlugin::default(),
         SimPlugin,
         View2dPlugin,
+        Scene3dPlugin,
         UiPlugin,
     ))
     .insert_resource(sim);

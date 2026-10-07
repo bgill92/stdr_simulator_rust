@@ -1,6 +1,8 @@
+use bevy::camera::visibility::RenderLayers;
 use bevy::input::mouse::{AccumulatedMouseScroll, MouseScrollUnit};
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
+use bevy_egui::PrimaryEguiContext;
 use bevy_egui::input::EguiWantsInput;
 
 use super::map_texture::{MapTexture, map_rect};
@@ -19,9 +21,22 @@ const ZOOM_STEP: f32 = 1.1;
 const PIXELS_PER_NOTCH: f32 = 40.0;
 /// Margin around the map after a fit.
 const FIT_MARGIN: f32 = 1.05;
+/// The overlay gizmos' own layer: only the 2D camera sees it, so 3D cameras never draw them.
+const OVERLAY_LAYER: usize = 1;
 
-pub fn spawn_camera(mut commands: Commands) {
-    commands.spawn((Camera2d, MainCamera));
+/// Also hosts egui, explicitly: in the 3D view it stays active (clearing nothing) so the panels
+/// keep drawing over the 3D camera.
+pub fn spawn_camera(mut commands: Commands, mut gizmos: ResMut<GizmoConfigStore>) {
+    gizmos
+        .config_mut::<DefaultGizmoConfigGroup>()
+        .0
+        .render_layers = RenderLayers::layer(OVERLAY_LAYER);
+    commands.spawn((
+        Camera2d,
+        MainCamera,
+        PrimaryEguiContext,
+        RenderLayers::from_layers(&[0, OVERLAY_LAYER]),
+    ));
 }
 
 /// World units per logical pixel.
@@ -37,6 +52,14 @@ pub fn cursor_world(window: &Window, camera: &Camera, at: &GlobalTransform) -> O
     camera
         .viewport_to_world_2d(at, window.cursor_position()?)
         .ok()
+}
+
+/// This frame's wheel movement in notches, whatever unit the device reports.
+pub fn scroll_notches(scroll: &AccumulatedMouseScroll) -> f32 {
+    match scroll.unit {
+        MouseScrollUnit::Line => scroll.delta.y,
+        MouseScrollUnit::Pixel => scroll.delta.y / PIXELS_PER_NOTCH,
+    }
 }
 
 /// On every new map texture (and every frame while locked): centre the map and fit it to the window.
@@ -85,10 +108,7 @@ pub fn camera_pan_zoom(
         t.translation += (g - p).extend(0.0);
         cursor = Some(g);
     }
-    let notches = match scroll.unit {
-        MouseScrollUnit::Line => scroll.delta.y,
-        MouseScrollUnit::Pixel => scroll.delta.y / PIXELS_PER_NOTCH,
-    };
+    let notches = scroll_notches(&scroll);
     if notches != 0.0 {
         let factor = ZOOM_STEP.powf(-notches);
         o.scale *= factor;

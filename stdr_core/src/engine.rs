@@ -56,6 +56,9 @@ pub struct RobotRuntime {
     pub data: Vec<Option<Measurement>>,
     /// Whether the last step's motion was blocked.
     pub collided: bool,
+    /// Sensor indices the last `step` fired, with or without a map: the app's "capture this
+    /// frame" signal for cameras, whose `data` stays `None`.
+    pub fired: Vec<usize>,
     scheduler: RateScheduler,
 }
 
@@ -165,6 +168,7 @@ impl SimulationEngine {
                     cmd_vel: Twist2D::default(),
                 },
                 collided: false,
+                fired: Vec::new(),
                 scheduler,
             },
         );
@@ -209,7 +213,7 @@ impl SimulationEngine {
     /// One tick of `step_dt`: noisy truth and clean odometry integrate the command; a blocked
     /// path holds truth but odometry still advances (wheels turn, encoders cannot see the wall);
     /// due sensors fire from the committed truth pose. Without a map nothing collides and no
-    /// sensor fires.
+    /// sensor produces data (`fired` still lists the due ones).
     pub fn step(&mut self) {
         let dt = self.step_dt;
         for r in self.robots.values_mut() {
@@ -227,15 +231,14 @@ impl SimulationEngine {
             if !r.collided {
                 s.pose = pose;
             }
-            for i in r.scheduler.tick() {
+            r.fired = r.scheduler.tick();
+            for &i in &r.fired {
                 if let Some(g) = &self.map {
                     let sensor = &r.config.sensors[i];
-                    r.data[i] = Some(simulate(
-                        sensor,
-                        s.pose * sensor.common.pose,
-                        g,
-                        &mut self.rng,
-                    ));
+                    if let Some(m) = simulate(sensor, s.pose * sensor.common.pose, g, &mut self.rng)
+                    {
+                        r.data[i] = Some(m);
+                    }
                 }
             }
         }
@@ -253,6 +256,7 @@ impl SimulationEngine {
                 cmd_vel: Twist2D::default(),
             };
             r.data.fill(None);
+            r.fired.clear();
             r.collided = false;
         }
         self.elapsed = 0.0;

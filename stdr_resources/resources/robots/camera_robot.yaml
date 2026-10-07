@@ -1,0 +1,26 @@
+robot:
+  robot_specifications:
+    - footprint:
+        footprint_specifications:
+          radius: 0.2
+    - initial_pose:
+        x: 3
+        y: 2
+        theta: 1.57
+    - laser:
+        filename: laser_sensors/hokuyo/hokuyo_URG_04LX.yaml
+    - camera:
+        camera_specifications:
+          pose:
+            x: 0.15
+            y: 0
+            theta: 0
+          frequency: 10
+          frame_id: front_camera
+          width: 320
+          height: 240
+          fov: 1.0472
+          near: 0.05
+          far: 50
+    - kinematic:
+        filename: kinematic_models/ideal_kinematic.yaml

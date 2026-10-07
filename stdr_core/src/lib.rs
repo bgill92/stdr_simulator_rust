@@ -15,8 +15,8 @@ mod sensors;
 
 pub use collision::path_collides;
 pub use config::{
-    AlphaRow, Alphas, KinematicConfig, KinematicKind, LaserSpec, OdometryModel, RobotConfig,
-    Sensor, SensorCommon, SensorConfig, SonarSpec, load_robot_config,
+    AlphaRow, Alphas, CameraSpec, KinematicConfig, KinematicKind, LaserSpec, OdometryModel,
+    RobotConfig, Sensor, SensorCommon, SensorConfig, SonarSpec, load_robot_config,
 };
 pub use engine::{RobotId, RobotRuntime, RobotState, SimulationEngine};
 pub use error::CoreError;
