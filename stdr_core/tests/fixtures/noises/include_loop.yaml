@@ -1,0 +1,5 @@
+# Includes itself through a nested `noise:` entry.
+noise:
+  noise_specifications:
+    noise:
+      filename: noises/include_loop.yaml

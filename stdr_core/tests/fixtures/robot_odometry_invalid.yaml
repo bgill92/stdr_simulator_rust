@@ -1,0 +1,13 @@
+robot:
+  robot_specifications:
+    - footprint:
+        footprint_specifications:
+          radius: 0.05
+    - initial_pose:
+        x: 0
+        y: 0
+        theta: 0
+    - kinematic:
+        kinematic_specifications:
+          kinematic_model: ideal
+          odometry_model: bogus

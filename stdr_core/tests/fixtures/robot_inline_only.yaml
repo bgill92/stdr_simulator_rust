@@ -1,0 +1,24 @@
+robot:
+  robot_specifications:
+    - footprint:
+        footprint_specifications:
+          radius: 0.2
+    - initial_pose:
+        x: 1.0
+        y: 2.0
+        theta: 0.5
+    - laser:
+        laser_specifications:
+          max_angle: 1.57
+          min_angle: -1.57
+          max_range: 8.0
+          min_range: 0.1
+          num_rays: 180
+          frequency: 5.0
+          pose:
+            x: 0.1
+            y: 0.0
+            theta: 0.0
+    - kinematic:
+        kinematic_specifications:
+          kinematic_model: omni

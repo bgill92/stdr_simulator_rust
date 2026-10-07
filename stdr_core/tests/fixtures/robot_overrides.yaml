@@ -1,0 +1,25 @@
+robot:
+  robot_specifications:
+    - footprint:
+        footprint_specifications:
+          radius: 0.3
+    # Partial inline pose: only theta overridden.
+    - laser:
+        filename: laser_sensors/offset_laser.yaml
+        laser_specifications:
+          pose:
+            theta: 1.0
+    # Inline noise_std 0 turns file noise off.
+    - laser:
+        filename: laser_sensors/offset_laser.yaml
+        laser_specifications:
+          noise:
+            noise_specifications:
+              noise_std: 0
+    # Inline noise_mean alone changes nothing.
+    - laser:
+        filename: laser_sensors/offset_laser.yaml
+        laser_specifications:
+          noise:
+            noise_specifications:
+              noise_mean: 0.7

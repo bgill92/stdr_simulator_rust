@@ -1,0 +1,6 @@
+image: tiny.pgm
+resolution: 0.02
+origin: [1.5, -2.0, 0.0]
+occupied_thresh: 0.6
+free_thresh: 0.3
+negate: 0
