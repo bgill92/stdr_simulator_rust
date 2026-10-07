@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 use bevy::time::TimeUpdateStrategy;
+use stdr_app::plot::{PlotterCtl, PlotterNames, ShowPlotter, add_plotter, add_plotters, registry};
 use stdr_app::sim::{Selection, SimCommand, SimEvent, SimPlugin, SimWorld};
 use stdr_app::ui::teleop::{TeleopPlugin, TeleopState};
 use stdr_app::ui::toolbar::status_text;
@@ -511,4 +512,167 @@ fn spawn_from_bad_path_logs_instead_of_failing() {
     app.update();
     assert_eq!(sim(&app).robots().count(), 0);
     assert!(matches!(seen(&app), [SimEvent::Log(m)] if m.starts_with("Failed to spawn robot")));
+}
+
+/// A fixture plotter: its state counts the frames its sample system ran since the last reset.
+#[derive(Resource, Default)]
+struct Samples(u32);
+
+fn count_sample(mut s: ResMut<Samples>) {
+    s.0 += 1;
+}
+
+fn fixture_plotter_app() -> App {
+    let mut app = app();
+    add_plotter::<Samples, _, _>(&mut app, "Fixture", count_sample, || {});
+    app
+}
+
+fn samples(app: &App) -> u32 {
+    app.world().resource::<Samples>().0
+}
+
+fn ctl(app: &mut App) -> Mut<'_, PlotterCtl<Samples>> {
+    app.world_mut().resource_mut::<PlotterCtl<Samples>>()
+}
+
+#[test]
+fn paused_or_removed_plotter_does_not_sample() {
+    let mut app = fixture_plotter_app();
+    app.update();
+    assert_eq!(samples(&app), 1);
+    ctl(&mut app).paused = true;
+    app.update();
+    assert_eq!(samples(&app), 1, "pause keeps state and skips sampling");
+    ctl(&mut app).paused = false;
+    app.update();
+    assert_eq!(samples(&app), 2);
+    ctl(&mut app).removed = true;
+    app.update();
+    assert_eq!(samples(&app), 2);
+}
+
+#[test]
+fn reset_defaults_plotter_state() {
+    let mut app = fixture_plotter_app();
+    for _ in 0..3 {
+        app.update();
+    }
+    assert_eq!(samples(&app), 3);
+    send(&mut app, SimCommand::Reset);
+    // Reset lands in PreUpdate, before this frame's sample.
+    app.update();
+    assert_eq!(samples(&app), 1);
+}
+
+#[test]
+fn showing_a_removed_plotter_restarts_it() {
+    let mut app = fixture_plotter_app();
+    app.update();
+    app.update();
+    ctl(&mut app).removed = true;
+    // A request for another plotter leaves this one closed.
+    app.world_mut().write_message(ShowPlotter("Other"));
+    app.update();
+    assert_eq!(samples(&app), 2);
+    app.world_mut().write_message(ShowPlotter("Fixture"));
+    app.update();
+    assert!(!ctl(&mut app).removed);
+    assert_eq!(samples(&app), 1);
+}
+
+#[test]
+fn every_plotter_is_registered_and_samples_headless() {
+    // Also proves the `inventory` entries survive linking the library as an rlib, as `main` does.
+    let keys: Vec<_> = registry().iter().map(|e| e.key).collect();
+    assert_eq!(
+        keys,
+        ["MapTrace", "OdometryTrace", "PoseError", "ScanTrace"]
+    );
+
+    let mut app = app();
+    add_plotters(&mut app, &[]);
+    assert_eq!(app.world().resource::<PlotterNames>().0.len(), 4);
+    let id = {
+        let mut s = sim_mut(&mut app);
+        s.set_map(free_map());
+        s.spawn(
+            laser_robot(),
+            Pose2D {
+                x: 5.0,
+                y: 5.0,
+                theta: 0.0,
+            },
+        )
+    };
+    app.world_mut().resource_mut::<Selection>().robot = Some(id);
+    send(&mut app, SimCommand::Start);
+    for _ in 0..40 {
+        app.update();
+    }
+    // Pose Error drives the selected robot in a circle.
+    let r = sim(&app).robot(id).unwrap();
+    assert_eq!(
+        r.state.cmd_vel,
+        Twist2D {
+            linear_x: 0.3,
+            linear_y: 0.0,
+            angular_z: 0.5
+        }
+    );
+    assert!(r.state.pose.x != 5.0 || r.state.pose.y != 5.0);
+}
+
+#[test]
+fn held_teleop_keys_override_pose_error() {
+    let mut app = app();
+    app.add_plugins(TeleopPlugin)
+        .init_resource::<ButtonInput<KeyCode>>();
+    add_plotters(&mut app, &["PoseError".into()]);
+    let id = sim_mut(&mut app).spawn(RobotConfig::default(), Pose2D::default());
+    app.world_mut().resource_mut::<Selection>().robot = Some(id);
+    let cmd_vel = |app: &App| sim(app).robot(id).unwrap().state.cmd_vel;
+    let drive = Twist2D {
+        linear_x: 0.3,
+        linear_y: 0.0,
+        angular_z: 0.5,
+    };
+
+    app.update();
+    app.update();
+    assert_eq!(cmd_vel(&app), drive);
+
+    // Both write CmdVel every frame; teleop's comes last, so it is the one applied.
+    keys(&mut app).press(KeyCode::KeyW);
+    app.update();
+    for _ in 0..5 {
+        app.update();
+        assert_eq!(
+            cmd_vel(&app),
+            Twist2D {
+                linear_x: 0.5,
+                ..Default::default()
+            }
+        );
+    }
+
+    keys(&mut app).release(KeyCode::KeyW);
+    app.update();
+    app.update();
+    app.update();
+    assert_eq!(
+        cmd_vel(&app),
+        drive,
+        "Pose Error resumes once the keys are released"
+    );
+}
+
+#[test]
+fn plotter_filter_builds_only_the_named_plotters() {
+    let mut app = app();
+    add_plotters(
+        &mut app,
+        &["MapTrace".into(), "MapTrace".into(), "Nope".into()],
+    );
+    assert_eq!(app.world().resource::<PlotterNames>().0, ["Map Trace"]);
 }

@@ -2,14 +2,20 @@ use bevy::asset::RenderAssetUsages;
 use bevy::image::ImageSampler;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+use bevy_egui::{EguiTextureHandle, EguiUserTextures, egui};
 use stdr_core::OccupancyGrid;
 
 use crate::sim::SimWorld;
 
-/// The map image, rebuilt only when the engine's map revision moves.
+/// The map image, rebuilt only when the engine's map revision moves. Shared by the map sprite and
+/// the plotters' `PlotImage`.
 #[derive(Resource, Default)]
 pub struct MapTexture {
     pub image: Handle<Image>,
+    /// `image` registered with egui; `None` without the egui plugin (headless) or before a map.
+    pub egui_id: Option<egui::TextureId>,
+    /// World-space rectangle the map covers, in metres.
+    pub rect: Rect,
     /// The `map_revision` `image` was built from; 0 = no map yet.
     pub revision: u64,
 }
@@ -68,6 +74,7 @@ pub fn sync_map_texture(
     sim: Res<SimWorld>,
     mut tex: ResMut<MapTexture>,
     mut images: ResMut<Assets<Image>>,
+    egui_textures: Option<ResMut<EguiUserTextures>>,
     sprite: Query<Entity, With<MapSprite>>,
     mut commands: Commands,
 ) {
@@ -76,11 +83,15 @@ pub fn sync_map_texture(
     }
     let Some(grid) = sim.map() else { return };
     let image = images.add(grid_image(grid));
+    // Weak: the strong handle lives here, and bevy_egui drops the id once the image is freed.
+    let egui_id = egui_textures.map(|mut t| t.add_image(EguiTextureHandle::Weak(image.id())));
+    let rect = map_rect(grid);
     *tex = MapTexture {
         image: image.clone(),
+        egui_id,
+        rect,
         revision: sim.map_revision(),
     };
-    let rect = map_rect(grid);
     let bundle = (
         Sprite {
             image,

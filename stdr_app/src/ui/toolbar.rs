@@ -7,6 +7,7 @@ use bevy_egui::{EguiContexts, egui};
 use stdr_core::{Pose2D, SimulationEngine};
 
 use super::messages::MessageLog;
+use crate::plot::{PlotterNames, ShowPlotter};
 use crate::sim::{SimCommand, SimEvent, SimWorld, load_robot};
 
 pub const SPEEDS: [f64; 4] = [0.5, 1.0, 2.0, 5.0];
@@ -71,8 +72,10 @@ pub fn toolbar(
     sim: Res<SimWorld>,
     log: Res<MessageLog>,
     mut spawn: ResMut<SpawnDialog>,
+    plotters: Res<PlotterNames>,
     mut cmd: MessageWriter<SimCommand>,
     mut events: MessageWriter<SimEvent>,
+    mut show: MessageWriter<ShowPlotter>,
     mut exit: MessageWriter<AppExit>,
 ) -> Result {
     let ctx = ctx.ctx_mut()?;
@@ -131,6 +134,15 @@ pub fn toolbar(
                                 }
                             }
                         });
+                    });
+                    // Re-opens a plotter whose window was closed.
+                    ui.menu_button("Plotters", |ui| {
+                        for &name in &plotters.0 {
+                            if ui.button(name).clicked() {
+                                show.write(ShowPlotter(name));
+                                ui.close();
+                            }
+                        }
                     });
                 });
                 ui.horizontal(|ui| sim_buttons(ui, &mut cmd));
