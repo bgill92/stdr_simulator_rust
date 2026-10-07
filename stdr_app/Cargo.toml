@@ -6,3 +6,18 @@ license.workspace = true
 
 [dependencies]
 stdr_core = { path = "../stdr_core" }
+# Default features minus audio (ALSA), gamepads (libudev) and native Wayland (libwayland-dev; XWayland
+# covers it), so the build needs no system dev packages. ui/3d/scene/picking are unused in 2D.
+bevy = { version = "0.19.1", default-features = false, features = [
+    "2d_bevy_render",
+    "default_app",
+    "std",
+    "multi_threaded",
+    "bevy_winit",
+    "x11",
+    "keyboard",
+    "mouse",
+] }
+bevy_egui = { version = "0.42.0", default-features = false, features = ["render", "default_fonts"] }
+clap = { version = "4", features = ["derive"] }
+rfd = { version = "0.17.2", default-features = false, features = ["xdg-portal"] }
