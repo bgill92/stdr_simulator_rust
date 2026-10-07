@@ -11,9 +11,11 @@ the design and milestone plan live in [PLAN.md](PLAN.md).
 - **M1 (done):** core simulation in `stdr_core`: kinematics and odometry noise, swept-footprint
   collision, laser and sonar, per-sensor rate scheduling, and `SimulationEngine` (robots, map,
   sim time, one seedable RNG), plus the `headless` example.
-- **M2–M4 (not started):** Bevy app, plotters, 3D scene + camera sensor. See PLAN.md for details.
-
-`stdr_app` is currently an empty placeholder crate.
+- **M2 (done):** `stdr_app`, the Bevy app: 2D map view with pan/zoom, robot and sensor overlay,
+  click-to-select, right-click teleport/delete, WASD/QE keyboard teleop, and egui toolbar,
+  robot info and message panels. The simulation runs in Bevy's fixed timestep, starts paused,
+  and caps catch-up at 0.25 s of sim time per frame.
+- **M3–M4 (not started):** plotters, 3D scene + camera sensor. See PLAN.md for details.
 
 ## Build and test
 
@@ -32,6 +34,20 @@ STDR_RESOURCES_DIR=stdr_resources/resources cargo run -p stdr_core --example hea
 
 With `--noise-off` the output is meant to be diffed line for line against the C++ engine run
 the same way; `--seed N` makes noisy runs reproducible. See the example's header for all flags.
+
+Run the app (opens a window; press Start, then drive the selected robot with W/S, A/D (omni
+strafe), Q/E):
+
+```sh
+STDR_RESOURCES_DIR=stdr_resources/resources cargo run -p stdr_app -- \
+  --map stdr_resources/maps/sparse_obstacles.yaml \
+  --robot stdr_resources/resources/robots/simple_robot_realistic.yaml --x 3 --y 2 --theta 1.57
+```
+
+`--x/--y/--theta` override the robot yaml's `initial_pose` field by field; without them the yaml
+pose is used. Robots loaded through File → Load Robot resolve includes the same way, so start the
+app with `STDR_RESOURCES_DIR` set when loading the shipped robots. The app talks X11 (Wayland
+desktops run it through XWayland), so building it needs no system dev packages.
 
 CI runs `cargo fmt --check`, `cargo clippy`, and `cargo test` on pushes to `main` and on pull requests.
 

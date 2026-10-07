@@ -65,8 +65,10 @@ stdr_simulator_rust/
     tests/                    # golden tests transcribed from C++ gtests (names kept)
     examples/headless.rs      # --seed; step N ticks noise-off, print poses (diff vs C++ run)
   stdr_app/                   # bin. bevy + egui + plotters.
-    src/main.rs               # clap: --map --robot --x --y --theta --plotter (repeatable); iterates inventory entries
-    src/sim/{plugin,resources,commands,step}.rs
+    src/main.rs               # loads --map/--robot (fail fast), adds the plugins; --plotter (repeatable) lands in M3
+    src/lib.rs                # the plugins as a library, so tests/headless.rs can drive them
+    src/cli.rs                # clap: --map --robot --x --y --theta
+    src/sim/{mod,commands}.rs # SimPlugin + resources + sim_step; SimCommand/SimEvent + apply_sim_commands
     src/view2d/{map_texture,robots,camera,picking}.rs   # robots.rs = GizmoCanvas + per-frame draw_robot/draw_sensors calls
     src/ui/{toolbar,robot_info,messages,teleop}.rs      # teleop.rs = teleop_twist(keys, KinematicKind, speeds) pure fn + unit tests
     src/overlay.rs            # trait Canvas, Style, draw_robot, draw_sensors, draw_trail, geometry helpers (no bevy/egui types)
@@ -520,7 +522,7 @@ unit tests), egui toolbar/robot info/messages, CLI.
 Headless tests (`MinimalPlugins` + `TimeUpdateStrategy::ManualDuration`): N updates advance `engine.sim_time()` by
 `ticks·step_dt`; pause freezes; resume does not replay; 2× speed doubles ticks/frame; `SetStepDt` changes timestep;
 2 s manual delta capped to 0.25 s sim; reset restores spawn pose / zero twist / `data = None` / `sim_time == 0`; `FellBehind` fires once;
-`pause_resume_via_command`; `teleport_stop_targets_previously_driven_robot`; `map_texture_rebuilds_only_on_revision_change`;
+`pause_resume_via_command`; `teleop_stop_targets_previously_driven_robot`; `map_texture_rebuilds_only_on_revision_change`;
 `selection_falls_back_to_first_robot`; `yaml_pose_used_when_flags_absent`; `toolbar_reads_speed_from_virtual_time`;
 `overlay::draw_robot_records_expected_calls` (RecordingCanvas, no Bevy).
 
@@ -542,7 +544,7 @@ Per seam above. Perf check on `frieburg.png`.
 
 | Crate | Purpose | Known-good at plan time (2026-10) |
 |---|---|---|
-| `bevy` | engine; default features minus audio; `dynamic_linking` in dev | 0.19.1 stable (0.20 in rc) |
+| `bevy` | engine; 2D render + winit/X11 features (no audio, gamepad or native Wayland: those need ALSA/libudev/libwayland dev packages) | 0.19.1 stable (0.20 in rc) |
 | `bevy_egui` | egui integration | 0.40–0.42 pair with Bevy 0.19 |
 | `egui`, `egui_plot` | UI + plots; **egui version must match what bevy_egui pins** | egui_plot 0.37 latest |
 | `inventory` | plotter self-registration | |
