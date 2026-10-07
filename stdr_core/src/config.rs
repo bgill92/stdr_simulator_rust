@@ -72,9 +72,10 @@ impl TryFrom<String> for OdometryModel {
     }
 }
 
-/// Velocity-model noise coefficients: rows Ux, Uy, W, G; columns ux², uy², w².
+/// Velocity-model noise coefficients: rows Ux, Uy, W, G; columns ux², uy², w². Every entry is finite
+/// and non-negative (enforced at load).
 #[derive(Clone, Copy, PartialEq, Debug, Default, Deserialize)]
-#[serde(from = "AlphasYaml")]
+#[serde(try_from = "AlphasYaml")]
 pub struct Alphas(pub [[f64; 3]; 4]);
 
 /// Row selector for `Alphas::variance`.
@@ -115,14 +116,36 @@ struct AlphasYaml {
     a_g_w: f64,
 }
 
-impl From<AlphasYaml> for Alphas {
-    fn from(a: AlphasYaml) -> Self {
-        Alphas([
+impl TryFrom<AlphasYaml> for Alphas {
+    type Error = String;
+
+    /// Negative or non-finite alphas would make `perturb`'s sigma NaN/inf, silently zeroing noise.
+    fn try_from(a: AlphasYaml) -> Result<Self, String> {
+        let fields = [
+            ("a_ux_ux", a.a_ux_ux),
+            ("a_ux_uy", a.a_ux_uy),
+            ("a_ux_w", a.a_ux_w),
+            ("a_uy_ux", a.a_uy_ux),
+            ("a_uy_uy", a.a_uy_uy),
+            ("a_uy_w", a.a_uy_w),
+            ("a_w_ux", a.a_w_ux),
+            ("a_w_uy", a.a_w_uy),
+            ("a_w_w", a.a_w_w),
+            ("a_g_ux", a.a_g_ux),
+            ("a_g_uy", a.a_g_uy),
+            ("a_g_w", a.a_g_w),
+        ];
+        if let Some((name, v)) = fields.iter().find(|(_, v)| !(v.is_finite() && *v >= 0.0)) {
+            return Err(format!(
+                "kinematic_parameters.{name} = {v}: must be finite and non-negative"
+            ));
+        }
+        Ok(Alphas([
             [a.a_ux_ux, a.a_ux_uy, a.a_ux_w],
             [a.a_uy_ux, a.a_uy_uy, a.a_uy_w],
             [a.a_w_ux, a.a_w_uy, a.a_w_w],
             [a.a_g_ux, a.a_g_uy, a.a_g_w],
-        ])
+        ]))
     }
 }
 

@@ -333,6 +333,23 @@ mod config {
     }
 
     #[test]
+    fn negative_alpha_rejected_at_load() {
+        let err = load_err("robot_alpha_neg.yaml");
+        assert!(
+            err.contains("robot_alpha_neg.yaml") && err.contains("a_w_uy") && err.contains("-0.05"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn non_finite_alpha_rejected_at_load() {
+        for name in ["robot_alpha_nan.yaml", "robot_alpha_inf.yaml"] {
+            let err = load_err(name);
+            assert!(err.contains(name) && err.contains("a_w_uy"), "{err}");
+        }
+    }
+
+    #[test]
     fn noisy_kinematic_alphas_loaded() {
         let (cfg, _) = load_shipped("simple_robot_noisy.yaml");
         assert_eq!(cfg.kinematic.odometry, OdometryModel::Velocity);
