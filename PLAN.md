@@ -466,6 +466,7 @@ EguiPass    render:    Res<P> -> PlotCanvas / egui_plot::{Line, PlotImage}
 | Fix | Inline `noise_std: 0` disables file noise (C++ could not turn noise off inline) | `config::inline_noise_zero_disables` |
 | Fix | `frame_id` parsed for every sensor kind | `config::frame_id_parsed_for_all_kinds` |
 | Fix | Unknown `kinematic_model` rejected at load, not at spawn | `config::unknown_kinematic_rejected_at_load` |
+| Fix | Negative or non-finite odometry alphas rejected at load (C++ made `perturb` sigma NaN, silently zeroing that noise channel) | `config::negative_alpha_rejected_at_load`, `config::non_finite_alpha_rejected_at_load` |
 | Fix | `map.origin[2] != 0` → error instead of silently ignored | `map::rotated_origin_rejected` |
 | Fix | Path-collision theta lerp uses shortest arc | `collision::rotation_through_pi_uses_shortest_arc` |
 | Fix | Unknown-cell policy explicit (`Unknown`), one `is_blocked` | `grid::unknown_policy_is_explicit` |

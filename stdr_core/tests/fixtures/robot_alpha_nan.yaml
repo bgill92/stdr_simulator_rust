@@ -1,0 +1,12 @@
+robot:
+  robot_specifications:
+    - footprint:
+        footprint_specifications:
+          radius: 0.05
+    - kinematic:
+        kinematic_specifications:
+          kinematic_model: ideal
+          odometry_model: velocity
+          kinematic_parameters:
+            a_ux_ux: 0.1
+            a_w_uy: .nan
