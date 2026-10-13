@@ -442,7 +442,8 @@ EguiPass    render:    Res<P> -> PlotCanvas / egui_plot::{Line, PlotImage}
 - `OccupancyGrid -> Image` (`Rgba8UnormSrgb`): 0→white, 100→black, −1→grey. Grid row 0 = bottom; image row 0 = top; flip once on build. Rebuild on `map_revision` change.
 - Bevy 2D is X-right/Y-up = ROS map frame. Poses map to `Transform` directly, no flip. Map sprite `custom_size = (w·res, h·res)`, `translation = origin + size/2`.
 - Robots and sensors via `GizmoCanvas` + `overlay::{draw_robot, draw_sensors, draw_trail}`: footprint, heading, red tint when
-  `collided`, orange odom ghost, trail, laser rays, sonar cone. Per-sensor toggles via `SensorVisibility`.
+  `collided`, orange odom ghost, trail, laser rays, sonar cone. Per-sensor toggles via `SensorVisibility`;
+  trail toggle via `ShowTrails` (default off, Robot Info checkbox).
 - `Camera2d`: wheel zoom about cursor (`OrthographicProjection::scale`), middle-drag pan, fit-to-view on map load. All pointer input gated on `!egui_ctx.wants_pointer_input()`.
 - Left-click selects nearest robot (`viewport_to_world_2d` + `Footprint::contains`, 15 px fallback) → `Selection`. Right-click egui context menu: "Teleport here", "Delete robot", "Lock view".
 - Toolbar (egui top panel): File → Load Map / Load Robot (`rfd` file dialog), Simulation → Start/Pause/Reset, Speed, Timestep; status bar with elapsed sim time + messages. Spawn dialog (x/y/theta) after Load Robot, prefilled from YAML `initial_pose`.

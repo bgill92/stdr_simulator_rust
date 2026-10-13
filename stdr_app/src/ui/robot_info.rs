@@ -10,8 +10,8 @@ fn pose_text(label: &str, p: Pose2D) -> String {
     format!("{label}  x={:.3}  y={:.3}  θ={:.3}", p.x, p.y, p.theta)
 }
 
-/// Global trail toggle, then every robot: pose, odometry, command, and one row per sensor (draw toggle, rate, latest
-/// reading). Clicking a robot's name selects it.
+/// Global trail toggle, then every robot: pose, odometry, command, and one row per sensor
+/// (draw toggle, rate, latest reading). Clicking a robot's name selects it.
 pub fn robot_info(
     mut ctx: EguiContexts,
     dock: Res<Dock>,
