@@ -11,7 +11,7 @@ use bevy_egui::{EguiGlobalSettings, EguiPrimaryContextPass};
 
 pub use camera::{MainCamera, cursor_in_viewport, scroll_notches};
 pub use map_texture::{MapSprite, MapTexture, map_rect, sync_map_texture};
-pub use robots::{Trails, sample_trails};
+pub use robots::{ShowTrails, Trails, sample_trails};
 
 use crate::scene3d::{ViewMode, in_2d};
 use crate::sim::apply_sim_commands;
@@ -22,6 +22,7 @@ impl Plugin for View2dPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<MapTexture>()
             .init_resource::<Trails>()
+            .init_resource::<ShowTrails>()
             .init_resource::<camera::ViewLock>()
             .init_resource::<picking::ContextMenu>()
             .init_resource::<ViewMode>()
