@@ -17,6 +17,10 @@ const TRAIL_SPACING: f64 = 0.05;
 #[derive(Resource, Default)]
 pub struct Trails(pub HashMap<RobotId, Trail<Pose2D>>);
 
+/// Whether the main map draws `Trails`; sampling runs either way.
+#[derive(Resource, Default)]
+pub struct ShowTrails(pub bool);
+
 /// `Canvas` over Bevy gizmos: the only place overlay f64 world coordinates become `Vec2`.
 /// Gizmo line width is global, so `Style::width` is ignored here.
 pub struct GizmoCanvas<'a, 'w, 's> {
@@ -79,6 +83,7 @@ pub fn draw_overlay(
     mut gizmos: Gizmos,
     sim: Res<SimWorld>,
     trails: Res<Trails>,
+    show_trails: Res<ShowTrails>,
     sel: Res<Selection>,
     vis: Res<SensorVisibility>,
     proj: Single<&Projection, With<MainCamera>>,
@@ -88,7 +93,7 @@ pub fn draw_overlay(
         world_per_px: world_per_pixel(&proj),
     };
     for (id, r) in sim.robots() {
-        if let Some(trail) = trails.0.get(&id) {
+        if let Some(trail) = trails.0.get(&id).filter(|_| show_trails.0) {
             overlay::draw_trail(&mut c, trail.xy(), overlay::TRAIL);
         }
         overlay::draw_sensors(&mut c, r, |i| vis.0.contains(&(id, i)));

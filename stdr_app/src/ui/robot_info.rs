@@ -4,24 +4,27 @@ use stdr_core::{Measurement, Pose2D};
 
 use super::dock::{Dock, show_pane};
 use crate::sim::{Selection, SensorVisibility, SimCommand, SimWorld};
+use crate::view2d::ShowTrails;
 
 fn pose_text(label: &str, p: Pose2D) -> String {
     format!("{label}  x={:.3}  y={:.3}  θ={:.3}", p.x, p.y, p.theta)
 }
 
-/// Every robot: pose, odometry, command, and one row per sensor (draw toggle, rate, latest
-/// reading). Clicking a robot's name selects it.
+/// Global trail toggle, then every robot: pose, odometry, command, and one row per sensor
+/// (draw toggle, rate, latest reading). Clicking a robot's name selects it.
 pub fn robot_info(
     mut ctx: EguiContexts,
     dock: Res<Dock>,
     sim: Res<SimWorld>,
     mut sel: ResMut<Selection>,
     mut vis: ResMut<SensorVisibility>,
+    mut show_trails: ResMut<ShowTrails>,
     mut cmd: MessageWriter<SimCommand>,
 ) -> Result {
     show_pane(ctx.ctx_mut()?, "robot_info", dock.robot_info, |ui| {
         let dt = sim.step_dt();
         ui.label(format!("Sim step: {dt:.3} s ({:.1} Hz)", 1.0 / dt));
+        ui.checkbox(&mut show_trails.0, "Show robot trails");
         ui.separator();
         if sim.robots().next().is_none() {
             ui.label("No robots in simulation.");
