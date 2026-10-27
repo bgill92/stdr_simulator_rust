@@ -17,7 +17,8 @@ the design and milestone plan live in [PLAN.md](PLAN.md).
   robot info and message panels. The simulation runs in Bevy's fixed timestep, starts paused,
   and caps catch-up at 0.25 s of sim time per frame.
 - **M3 (done):** plotters over the map and sim time: Pose Error, Map Trace, Odometry
-  Trace and Scan Trace, compiled in and selected with `--plotter`.
+  Trace and Scan Trace, compiled in and selected with `--plotter`. Map View (map and robot
+  only) is a commented template for new plotters.
 - **M4 (done):** 3D view of the extruded map and robots (toolbar 2D/3D toggle; left-drag orbits,
   middle-drag pans, wheel zooms) and a camera sensor: the core schedules it, the app renders each
   camera into an image shown in the Cameras tab.
@@ -57,7 +58,7 @@ Plots pane, one tab per open plotter plus a Cameras tab while a camera sensor ex
 bar along the bottom with paused state, speed, dt, sim time and the latest message (hover it for
 the full log). Drag the pane borders to resize; the 2D map refits to its pane on resize.
 
-Every plotter opens by default; `--plotter KEY` (repeatable: `PoseError`, `MapTrace`,
+Every plotter opens by default; `--plotter KEY` (repeatable: `PoseError`, `MapTrace`, `MapView`,
 `OdometryTrace`, `ScanTrace`) opens only those. A tab's × closes its plotter and the Plotters menu
 re-opens it. Pose Error drives the selected robot in a circle while it is open; held teleop keys
 override it, and pausing or closing it stops the robot.

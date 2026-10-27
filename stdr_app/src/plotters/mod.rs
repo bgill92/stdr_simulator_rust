@@ -2,6 +2,7 @@
 //! which ones `plot::add_plotters` builds.
 
 mod map_trace;
+mod map_view;
 mod odometry_trace;
 mod pose_error;
 mod scan_trace;
