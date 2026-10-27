@@ -607,12 +607,18 @@ fn every_plotter_is_registered_and_samples_headless() {
     let keys: Vec<_> = registry().iter().map(|e| e.key).collect();
     assert_eq!(
         keys,
-        ["MapTrace", "OdometryTrace", "PoseError", "ScanTrace"]
+        [
+            "MapTrace",
+            "MapView",
+            "OdometryTrace",
+            "PoseError",
+            "ScanTrace"
+        ]
     );
 
     let mut app = app();
     add_plotters(&mut app, &[]);
-    assert_eq!(app.world().resource::<PlotterNames>().0.len(), 4);
+    assert_eq!(app.world().resource::<PlotterNames>().0.len(), 5);
     let id = {
         let mut s = sim_mut(&mut app);
         s.set_map(free_map());
