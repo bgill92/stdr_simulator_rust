@@ -58,7 +58,9 @@ fn sample(sel: Res<Selection>, mut st: ResMut<MapView>) {
 }
 
 /// Runs in the egui pass while the plotter is not removed, paused or not. It should only draw: all
-/// state changes belong in `sample`, so pausing freezes what is shown.
+/// state changes belong in `sample`, so pausing freezes what `sample` stored (here, which robot is
+/// followed). Anything read straight from `SimWorld` stays live, so the robot keeps moving while
+/// paused; a plotter that should freeze its whole display stores that data in its state instead.
 ///
 /// `plotter_tab` draws the tab (with its Pause checkbox) only while it is the selected Plots tab,
 /// so the body closure costs nothing when hidden. `PlotterCtl<MapView>` carries the pause flag the
